@@ -6,7 +6,165 @@ datasource db {
   provider = "postgresql"
 }
 
-model HealthCheck {
+model Company {
+  id             Int             @id @default(autoincrement())
+  name           String
+  createdAt      DateTime        @default(now())
+  sessions       Session[]
+  employees      Employee[]
+  projects       Project[]
+  activityEvents ActivityEvent[]
+}
+
+model Employee {
+  id              Int            @id @default(autoincrement())
+  name            String
+  email           String?
+  passwordHash    String?
+  companyId       Int?
+  status          EmployeeStatus @default(INVITED)
+  sessions        Session[]
+  role            EmployeeRole   @default(EMPLOYEE)
+  inviteToken     String?        @unique
+  inviteExpiresAt DateTime?
+  invitedAt       DateTime?
+  onboardedAt     DateTime?
+  lastLoginAt     DateTime?
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  company         Company?       @relation(fields: [companyId], references: [id])
+  hours           HourEntry[]
+
+  @@unique([companyId, email])
+}
+
+model Project {
+  id        Int         @id @default(autoincrement())
+  name      String
+  color     String?
+  companyId Int?
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  hours     HourEntry[]
+  company   Company?    @relation(fields: [companyId], references: [id])
+}
+
+model HourEntry {
+  id           Int        @id @default(autoincrement())
+  employeeId   Int
+  projectId    Int?
+  workDate     DateTime
+  fromTime     String
+  toTime       String
+  breakMinutes Int        @default(0)
+  hoursNet     Decimal    @db.Decimal(5, 2)
+  hoursBrut    Decimal?   @db.Decimal(5, 2)
+  rejectReason String?
+  description  String?
+  status       HourStatus @default(PENDING)
+  createdAt    DateTime   @default(now())
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  project      Project?   @relation(fields: [projectId], references: [id])
+}
+
+model Session {
+  id         Int    @id @default(autoincrement())
+  tokenHash  String @unique
+  employeeId Int
+  companyId  Int
+
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+
+  ip        String?
+  userAgent String?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, expiresAt])
+  @@index([employeeId, expiresAt])
+}
+
+enum HourStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EmployeeStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum EmployeeRole {
+  EMPLOYEE
+  ADMIN
+  OWNER
+}
+
+model ActivityEvent {
   id        Int      @id @default(autoincrement())
+  companyId Int
   createdAt DateTime @default(now())
+
+  actorType ActorType
+  actorId   Int? // null = SYSTEM
+  actorName String? // optional snapshot for readability
+
+  entityType EntityType
+  entityId   Int? // null for global events like LOGIN
+
+  eventType EventType
+  summary   String? // human-friendly line
+  meta      Json?     @db.JsonB // structured payload: prev/next/reason/etc.
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@index([companyId, eventType, createdAt])
+  @@index([companyId, actorType, actorId, createdAt])
+  @@index([companyId, entityType, entityId, createdAt])
+}
+
+enum ActorType {
+  EMPLOYEE
+  ADMIN
+  OWNER
+  SYSTEM
+}
+
+enum EntityType {
+  HOUR_ENTRY
+  EMPLOYEE
+  PROJECT
+  COMPANY
+  AUTH
+}
+
+enum EventType {
+  // Hours
+  HOUR_CREATED
+  HOUR_EDITED
+  HOUR_SUBMITTED
+  HOUR_APPROVED
+  HOUR_REJECTED
+  HOUR_REOPENED
+  HOUR_SUPERSEDED
+
+  // Auth / presence
+  LOGIN
+  LOGOUT
+
+  // Management
+  EMPLOYEE_INVITED
+  EMPLOYEE_ACTIVATED
+  EMPLOYEE_DISABLED
+
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DISABLED
 }
