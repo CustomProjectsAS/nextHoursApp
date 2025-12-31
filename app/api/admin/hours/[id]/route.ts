@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
 import { okNext, failNext } from "@/lib/api/nextResponse";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
+
 
 
 
@@ -78,20 +81,26 @@ function calculateHours(
 
 // PATCH /api/admin/hours/[id]  -> update an entry
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await getAuthContext(req);
-  if (!ctx) {
-    return failNext("AUTH_REQUIRED", "Unauthorized", 401);
-  }
+  const requestId = getOrCreateRequestId(req);
 
-  if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
-    return failNext("FORBIDDEN", "Forbidden", 403);
-  }
+  const ctx = await getAuthContext(req);
+
+  if (!ctx) {
+  log.warn("AUTH_REQUIRED: admin/hours/[id] PATCH", { requestId });
+  return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
+}
+
+if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
+  log.warn("FORBIDDEN: admin/hours/[id] PATCH", { requestId, role: ctx.role });
+  return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
+}
+
 
 
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!Number.isFinite(id) || id <= 0) {
-    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400);
+    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400, undefined, requestId);
   }
 
 
@@ -105,13 +114,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       },
     });
 
-    if (!existing) {
-      return failNext("NOT_FOUND", "Hour entry not found", 404);
+        if (!existing) {
+      return failNext("NOT_FOUND", "Hour entry not found", 404, undefined, requestId);
     }
 
-    if (existing.status === "APPROVED") {
-      return failNext("FORBIDDEN", "Entry is approved and cannot be edited.", 409);
+
+       if (existing.status === "APPROVED") {
+      return failNext("FORBIDDEN", "Entry is approved and cannot be edited.", 409, undefined, requestId);
     }
+
 
     const body = await req.json();
 
@@ -140,7 +151,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (breakMinutes !== undefined) data.breakMinutes = breakMinutes;
     if (projectId !== undefined) {
       if (projectId == null) {
-        return failNext("VALIDATION", "projectId is required", 400);
+        return failNext("VALIDATION", "projectId is required", 400, undefined, requestId);
       }
 
 
@@ -150,7 +161,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       });
 
       if (!proj) {
-        return failNext("VALIDATION", "Invalid projectId for this company", 400);
+        return failNext("VALIDATION", "Invalid projectId for this company", 400, undefined, requestId);
       }
 
 
@@ -227,14 +238,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       },
     });
 
-    return okNext(updated);
+    return okNext(updated, undefined, requestId);
 
 
 
   } catch (err: any) {
-    console.error("PATCH /api/admin/hours/[id] error:", err);
-    return failNext("INTERNAL", err?.message ?? "Unknown error", 500);
-  }
+  log.error("INTERNAL: admin/hours/[id] PATCH", {
+    requestId,
+    errorName: err?.name,
+    errorMessage: err?.message,
+  });
+  return failNext("INTERNAL", err?.message ?? "Unknown error", 500, undefined, requestId);
+}
+
 }
 
 
@@ -243,20 +259,27 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getOrCreateRequestId(req);
+
   const ctx = await getAuthContext(req);
-  if (!ctx) {
-    return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+
+    if (!ctx) {
+    log.warn("AUTH_REQUIRED: admin/hours/[id] DELETE", { requestId });
+    return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
   }
 
-  if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
-    return failNext("FORBIDDEN", "Forbidden", 403);
+
+    if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
+    log.warn("FORBIDDEN: admin/hours/[id] DELETE", { requestId, role: ctx.role });
+    return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
   }
+
 
   const { id: idParam } = await params;
   const id = Number(idParam);
 
   if (!Number.isFinite(id) || id <= 0) {
-    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400);
+    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400, undefined, requestId);
   }
 
   try {
@@ -268,12 +291,12 @@ export async function DELETE(
       select: { id: true, deletedAt: true },
     });
 
-    if (!existing) {
-      return failNext("NOT_FOUND", "Hour entry not found", 404);
+        if (!existing) {
+      return failNext("NOT_FOUND", "Hour entry not found", 404, undefined, requestId);
     }
 
     if (existing.deletedAt) {
-      return okNext({ alreadyDeleted: true });
+      return okNext({ alreadyDeleted: true }, undefined, requestId);
     }
 
     await prisma.hourEntry.update({
@@ -281,10 +304,15 @@ export async function DELETE(
       data: { deletedAt: new Date() },
     });
 
-    return okNext({ deleted: true });
-  } catch (err: any) {
-    console.error("DELETE /api/admin/hours/[id] error:", err);
-    return failNext("INTERNAL", err?.message ?? "Unknown error", 500);
+        return okNext({ deleted: true }, undefined, requestId);
+    } catch (err: any) {
+    log.error("INTERNAL: admin/hours/[id] DELETE", {
+      requestId,
+      errorName: err?.name,
+      errorMessage: err?.message,
+    });
+    return failNext("INTERNAL", err?.message ?? "Unknown error", 500, undefined, requestId);
   }
+
 }
 
