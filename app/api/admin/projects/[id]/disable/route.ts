@@ -1,27 +1,34 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
 import { okNext, failNext } from "@/lib/api/nextResponse";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
 
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getOrCreateRequestId(req);
   const ctx = await getAuthContext(req);
   if (!ctx) {
-    return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+    log.warn("AUTH_REQUIRED: admin/projects/[id]/disable POST", { requestId });
+    return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
   }
 
   if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
-    return failNext("FORBIDDEN", "Forbidden", 403);
+    log.warn("FORBIDDEN: admin/projects/[id]/disable POST", { requestId, role: ctx.role });
+    return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
   }
 
 
   const { id: idParam } = await params;
   const projectId = Number(idParam);
   if (!Number.isFinite(projectId) || projectId <= 0) {
-    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400);
+    log.warn("VALIDATION: admin/projects/[id]/disable POST (id)", { requestId, idParam });
+    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400, undefined, requestId);
   }
+
 
 
   try {
@@ -38,13 +45,15 @@ export async function POST(
     });
 
     if (!existing) {
-      return failNext("NOT_FOUND", "Project not found", 404);
+      log.warn("NOT_FOUND: admin/projects/[id]/disable POST", { requestId, projectId });
+      return failNext("NOT_FOUND", "Project not found", 404, undefined, requestId);
     }
 
 
     if (!existing.isActive) {
-      return okNext({ alreadyDisabled: true });
+      return okNext({ alreadyDisabled: true }, undefined, requestId);
     }
+
 
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -74,11 +83,18 @@ export async function POST(
       return proj;
     });
 
-    return okNext({ project: updated });
+    return okNext({ project: updated }, undefined, requestId);
 
-  } catch (err: any) {
-  console.error("POST /api/admin/projects/[id]/disable error:", err);
-  return failNext("INTERNAL", "Failed to disable project", 500);
-}
+
+   } catch (err: any) {
+    log.error("INTERNAL: admin/projects/[id]/disable POST", {
+      requestId,
+      projectId,
+      errorName: err?.name,
+      errorMessage: err?.message,
+    });
+    return failNext("INTERNAL", "Failed to disable project", 500, undefined, requestId);
+  }
+
 
 }
