@@ -1,362 +1,175 @@
 "use client";
 
-import { HoursTab } from "./hoursTab";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { TimelineTab } from "./timelineTab";
+import { useEffect, useState } from "react";
+import { useRequireAuth } from "@/lib/useRouteGuard";
+import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/components/LogoutButton";
 
-type HourStatus = "approved" | "pending";
 
-type HourEntry = {
-  id: number;
-  date: string;
-  from: string;
-  to: string;
-  breakLabel: string;
-  hoursNet: number;
-  projectName: string;
-  projectColor: string;
-  description: string;
-  status: HourStatus;
+type DashboardCounts = {
+  hoursPendingCount: number;
+  hoursRejectedCount: number;
+  activeEmployeesCount: number;
+  activeProjectsCount: number;
 };
 
-type EmployeeBlock = {
-  id: number;
-  name: string;
-  totalNet: number;
-  totalBrut: number;
-  entries: HourEntry[];
-};
-
-export type AdminHoursData = {
-  month: string;
-  monthLabel: string;
-  totalNet: number;
-  totalBrut: number;
-  entriesCount: number;
-  employees: EmployeeBlock[];
-};
-
-type EmployeeListItem = {
-  id: number;
-  name: string;
-  email?: string | null;
-  status?: string;
-};
-
-// simple helper – calls our API route
-async function getAdminHours(monthOffset = 0): Promise<AdminHoursData> {
-  const res = await fetch(`/api/admin/hours?monthOffset=${monthOffset}`, {
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to load admin hours");
-  }
-
-  return res.json();
+function toErrorMessage(payload: any, fallback: string) {
+  return payload?.error?.message ?? fallback;
 }
 
 
-async function getEmployees(): Promise<EmployeeListItem[]> {
-  const res = await fetch("/api/employees", {
-    cache: "no-store",
-  });
+export default function AdminDashboardPage() {
+  const { loading } = useRequireAuth({ redirectTo: "/login" });
 
-  if (!res.ok) {
-    throw new Error("Failed to load employees");
-  }
-
-  return res.json();
-}
-
-export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<
-    "hours" | "timeline" | "projects" | "employees"
-  >("hours");
-  const [data, setData] = useState<AdminHoursData | null>(null);
-  const [monthOffset, setMonthOffset] = useState(0);
-  const [hoursLoading, setHoursLoading] = useState(false);
-
-  const [employees, setEmployees] = useState<EmployeeListItem[] | null>(null);
-  const [employeesLoading, setEmployeesLoading] = useState(false);
-  const [employeesError, setEmployeesError] = useState<string | null>(null);
-
-  const [newEmpName, setNewEmpName] = useState("");
-  const [newEmpEmail, setNewEmpEmail] = useState("");
-  const [creatingEmployee, setCreatingEmployee] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [latestInviteUrl, setLatestInviteUrl] = useState<string | null>(null);
+  const [data, setData] = useState<DashboardCounts | null>(null);
+  const [fatal, setFatal] = useState<string | null>(null);
+  const [me, setMe] = useState<{ name: string | null; companyName: string | null } | null>(null);
 
   useEffect(() => {
-    // load hours data
-    setHoursLoading(true);
-    getAdminHours(0)
-      .then(setData)
-      .catch((err) => {
-        console.error(err);
-      })
-      .finally(() => {
-        setHoursLoading(false);
-      });
+    if (loading) return;
 
-    // load employees list
-    setEmployeesLoading(true);
-    getEmployees()
-      .then((emps) => {
-        setEmployees(emps);
-        setEmployeesError(null);
-      })
-      .catch((err) => {
-        console.error(err);
-        setEmployeesError("Failed to load employees.");
-      })
-      .finally(() => {
-        setEmployeesLoading(false);
-      });
-  }, []);
-  useEffect(() => {
     let cancelled = false;
 
-    setHoursLoading(true);
-    getAdminHours(monthOffset)
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch((err) => console.error(err))
-      .finally(() => {
-        if (!cancelled) setHoursLoading(false);
-      });
+    async function run() {
+      try {
+        const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+        const mePayload = await meRes.json();
+        if (mePayload?.ok && mePayload.data) {
+          setMe({
+            name: mePayload.data.name ?? null,
+            companyName: mePayload.data.companyName ?? null,
+          });
+        }
 
+
+
+        const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
+        const payload = await res.json();
+
+        if (cancelled) return;
+
+        if (!payload?.ok) {
+          setFatal(toErrorMessage(payload, "Failed to load dashboard."));
+          return;
+        }
+
+        const d = payload?.data;
+
+        if (
+          d &&
+          typeof d.hoursPendingCount === "number" &&
+          typeof d.hoursRejectedCount === "number" &&
+          typeof d.activeEmployeesCount === "number" &&
+          typeof d.activeProjectsCount === "number"
+        ) {
+          setData(d);
+          return;
+        }
+
+
+        setFatal("Dashboard response shape is invalid.");
+      } catch {
+        if (!cancelled) setFatal("Failed to load dashboard.");
+      }
+    }
+
+    run();
     return () => {
       cancelled = true;
     };
-  }, [monthOffset]);
+  }, [loading]);
 
+  if (loading) return null;
 
-  const handleCreateEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateError(null);
-    setLatestInviteUrl(null);
-
-    const name = newEmpName.trim();
-    const email = newEmpEmail.trim();
-
-    if (!name || !email) {
-      setCreateError("Name and email are required.");
-      return;
-    }
-
-    try {
-      setCreatingEmployee(true);
-
-      const res = await fetch("/api/admin/employees", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, email }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setCreateError(data.error || "Failed to create employee.");
-        setCreatingEmployee(false);
-        return;
-      }
-
-      // invite URL from backend
-      setLatestInviteUrl(data.inviteUrl ?? null);
-
-      // Optimistically add to list
-      if (data.employee) {
-        setEmployees((prev) =>
-          prev ? [...prev, data.employee as EmployeeListItem] : [data.employee],
-        );
-      }
-
-      // Reset form
-      setNewEmpName("");
-      setNewEmpEmail("");
-      setCreatingEmployee(false);
-    } catch (err: any) {
-      console.error("Create employee error:", err);
-      setCreateError("Something went wrong while creating the employee.");
-      setCreatingEmployee(false);
-    }
-  };
-
-  if (!data) {
+  if (fatal) {
     return (
-      <main className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <main className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full border rounded-xl p-6">
+          <h1 className="text-xl font-semibold mb-2">Admin</h1>
+          <p className="text-sm text-red-600">{fatal}</p>
+          <div className="mt-4">
+            <Button variant="outline" asChild>
+              <Link href="/admin/hours">Go to Hours</Link>
+            </Button>
+          </div>
+        </div>
       </main>
     );
   }
 
- return (
-  <main className="h-screen bg-background text-foreground overflow-hidden">
-    <div className="mx-auto flex h-full max-w-5xl flex-col px-4 py-2 overflow-hidden">
+  if (!data) return null;
 
-      {/* STICKY HEADER AREA */}
-      <div className="sticky top-0 z-40 bg-background pt-2">
-        <header className="flex items-center justify-between">
+  const pendingHighlight = data.hoursPendingCount > 0;
 
-          <h1 className="text-2xl font-bold tracking-tight">Admin dashboard</h1>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/">Back to home</Link>
-          </Button>
+  const Tile = ({
+    title,
+    subtitle,
+    href,
+    highlight,
+  }: {
+    title: string;
+    subtitle: string;
+    href: string;
+    highlight?: boolean;
+  }) => (
+    <Link
+      href={href}
+      className={[
+        "rounded-2xl border p-6 shadow-sm transition",
+        "bg-card hover:shadow-md",
+        highlight ? "border-orange-400" : "",
+      ].join(" ")}
+    >
+      <div className="text-2xl font-bold tracking-tight">{title}</div>
+      <div className="mt-2 text-sm text-muted-foreground">{subtitle}</div>
+      {highlight ? (
+        <div className="mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold border border-orange-400">
+          Attention needed
+        </div>
+      ) : null}
+    </Link>
+  );
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-5xl px-4 py-10 flex flex-col gap-6">
+        <header className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight">Admin</h1>
+            <p className="text-sm text-muted-foreground">
+              {me?.name ? `Hi, ${me.name}` : "Hi"} · {me?.companyName ?? "Company"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <LogoutButton />
+          </div>
         </header>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-4 border-b pb-2">
-          <button
-            onClick={() => setActiveTab("hours")}
-            className={`text-sm font-medium pb-1 border-b-2 ${activeTab === "hours"
-              ? "border-primary"
-              : "border-transparent text-muted-foreground"
-              }`}
-          >
-            Hours
-          </button>
 
-          <button
-            onClick={() => setActiveTab("timeline")}
-            className={`text-sm font-medium pb-1 border-b-2 ${activeTab === "timeline"
-              ? "border-primary"
-              : "border-transparent text-muted-foreground"
-              }`}
-          >
-            Timeline
-          </button>
-
-          <button
-            onClick={() => setActiveTab("projects")}
-            className={`text-sm font-medium pb-1 border-b-2 ${activeTab === "projects"
-              ? "border-primary"
-              : "border-transparent text-muted-foreground"
-              }`}
-          >
-            Projects
-          </button>
-
-          <button
-            onClick={() => setActiveTab("employees")}
-            className={`text-sm font-medium pb-1 border-b-2 ${activeTab === "employees"
-              ? "border-primary"
-              : "border-transparent text-muted-foreground"
-              }`}
-          >
-            Employees
-          </button>
-        </div>
-        </div>
-
-
-
-
-<div className="flex-1 overflow-hidden pt-2">
-
-        {activeTab === "hours" && <HoursTab data={data} onPrevMonth={() => setMonthOffset((v) => v - 1)}
-          onNextMonth={() => setMonthOffset((v) => v + 1)}
-          monthNavBusy={hoursLoading} />}
-
-        {activeTab === "timeline" && <TimelineTab data={data} />}
-
-        {activeTab === "projects" && (
-          <section className="rounded-xl border bg-card p-4">
-            <h2 className="text-lg font-semibold">Projects (coming soon)</h2>
-            <p className="text-sm text-muted-foreground">
-              Project management UI placeholder.
-            </p>
-          </section>
-        )}
-
-        {activeTab === "employees" && (
-          <section className="rounded-xl border bg-card p-4 space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold">Employees</h2>
-              <p className="text-sm text-muted-foreground">
-                Create employees and send them invite links.
-              </p>
-            </div>
-
-            <form
-              onSubmit={handleCreateEmployee}
-              className="grid gap-2 md:grid-cols-[1.2fr,1.5fr,auto]"
-            >
-              <div>
-                <label className="block text-xs font-medium mb-1">Name</label>
-                <input
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-                  value={newEmpName}
-                  onChange={(e) => setNewEmpName(e.target.value)}
-                  placeholder="Employee name"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">Email</label>
-                <input
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-                  type="email"
-                  value={newEmpEmail}
-                  onChange={(e) => setNewEmpEmail(e.target.value)}
-                  placeholder="employee@example.com"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button type="submit" size="sm" disabled={creatingEmployee}>
-                  {creatingEmployee ? "Creating…" : "Create & get link"}
-                </Button>
-              </div>
-            </form>
-
-            {createError && (
-              <p className="text-sm text-red-600">{createError}</p>
-            )}
-
-            {latestInviteUrl && (
-              <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs">
-                <p className="font-medium mb-1">Invite link</p>
-                <p className="break-all">{latestInviteUrl}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Copy this link and send it to the employee.
-                </p>
-              </div>
-            )}
-
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-semibold mb-2">Current employees</h3>
-              {employeesLoading && (
-                <p className="text-xs text-muted-foreground">Loading…</p>
-              )}
-              {employeesError && (
-                <p className="text-xs text-red-600">{employeesError}</p>
-              )}
-              {!employeesLoading && employees && employees.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No employees yet.
-                </p>
-              )}
-              {!employeesLoading && employees && employees.length > 0 && (
-                <ul className="space-y-1 text-sm">
-                  {employees.map((emp) => (
-                    <li
-                      key={emp.id}
-                      className="flex items-center justify-between border-b last:border-0 py-1"
-                    >
-                      <span>{emp.name}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </section>
-        )}
-        
-      </div>
+        <section className="grid gap-4 md:grid-cols-2">
+          <Tile
+            title="Hours"
+            subtitle={`${data.hoursPendingCount} pending · ${data.hoursRejectedCount} rejected`}
+            href="/admin/hours"
+            highlight={pendingHighlight}
+          />
+          <Tile
+            title="Timeline"
+            subtitle="Day view"
+            href="/admin/timeline"
+          />
+          <Tile
+            title="Employees"
+            subtitle={`${data.activeEmployeesCount} active`}
+            href="/admin/employees"
+          />
+          <Tile
+            title="Projects"
+            subtitle={`${data.activeProjectsCount} active`}
+            href="/admin/projects"
+          />
+        </section>
       </div>
     </main>
   );

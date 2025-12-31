@@ -1,37 +1,49 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
-type ValidateResponse =
-  | {
-      ok: true;
-      employee: {
-        id: number;
-        name: string;
-        email: string | null;
-        companyName: string | null;
-      };
-    }
-  | {
-      ok?: false;
-      error: string;
+type ValidateOk = {
+  ok: true;
+  data: {
+    invite: {
+      companyName: string | null;
+      status: string; // EmployeeStatus string from API
     };
+  };
+};
+
+
+type ApiError = {
+  ok: false;
+  error: { code: string; message: string; details?: any };
+};
+
+type ValidateResponse = ValidateOk | ApiError;
+
+type EmptyObject = Record<string, never>;
+type CompleteOk = { ok: true; data: EmptyObject };
+
+type CompleteResponse = CompleteOk | ApiError;
+
 
 function OnboardPageContent() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const router = useRouter();
+
+  const token = useMemo(() => searchParams.get("token"), [searchParams]);
 
   const [loading, setLoading] = useState(true);
   const [validateError, setValidateError] = useState<string | null>(null);
-  const [employee, setEmployee] =
-    useState<ValidateResponse extends { ok: true; employee: infer E } ? E : any>(
-      null,
-    );
+  const [invite, setInvite] = useState<ValidateOk["data"]["invite"]
+    | null>(null);
+
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -43,25 +55,32 @@ function OnboardPageContent() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setValidateError(null);
+
         const res = await fetch(
           `/api/onboarding/validate?token=${encodeURIComponent(token)}`,
         );
+
         const data: ValidateResponse = await res.json();
 
-        if (!res.ok || !("ok" in data) || !data.ok) {
+                if (!data.ok) {
           setValidateError(
-            (data as any).error || "Failed to validate invite link.",
+            data.ok === false
+              ? data.error?.message ?? "Failed to validate invite link."
+              : "Failed to validate invite link.",
           );
+
+          setInvite(null);
           setLoading(false);
           return;
         }
 
-        setEmployee(data.employee);
-        setName(data.employee.name || "");
+        setInvite(data.data.invite);
         setLoading(false);
       } catch (err: any) {
         console.error("Error validating invite:", err);
         setValidateError("Something went wrong while validating the invite.");
+        setInvite(null);
         setLoading(false);
       }
     };
@@ -73,31 +92,66 @@ function OnboardPageContent() {
     e.preventDefault();
     if (!token) return;
 
-    setSubmitting(true);
     setSubmitError(null);
+
+    const pw = password.trim();
+    const pw2 = confirmPassword.trim();
+
+    if (pw.length < 10) {
+      setSubmitError("Password must be at least 10 characters.");
+      return;
+    }
+    if (pw !== pw2) {
+      setSubmitError("Passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const res = await fetch("/api/onboarding/complete", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
-          name: name.trim() || employee?.name,
+          password: pw,
+          name: name.trim() || undefined,
         }),
       });
 
-      const data = await res.json();
+      const data: CompleteResponse = await res.json();
 
-      if (!res.ok || !data.ok) {
-        setSubmitError(data.error || "Failed to complete onboarding.");
+
+      if (data.ok === false) {
+
+        // complete route uses standardized error shape (ok:false, error:{...})
+        setSubmitError(
+          data.ok === false
+            ? data.error?.message ?? "Failed to complete onboarding."
+            : "Failed to complete onboarding.",
+        );
         setSubmitting(false);
         return;
       }
 
-      setDone(true);
-      setSubmitting(false);
+
+
+      // Session cookie is now set. Resolve role landing via /api/auth/me.
+      // Session cookie is now set. Resolve role landing via /api/auth/me.
+      const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+      const me = await meRes.json();
+
+      if (me?.ok && me?.data?.role) {
+        const role = String(me.data.role);
+        router.replace(role === "EMPLOYEE" ? "/employee" : "/admin");
+        return;
+      }
+
+
+      // Fallback: send to /login (guard should redirect authed users away anyway)
+      router.replace("/login");
+      return;
+
     } catch (err: any) {
       console.error("Error completing onboarding:", err);
       setSubmitError("Something went wrong while completing onboarding.");
@@ -127,27 +181,10 @@ function OnboardPageContent() {
     );
   }
 
-  if (!employee) {
+  if (!invite) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <p>Something went wrong. No employee data found.</p>
-      </main>
-    );
-  }
-
-  if (done) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="max-w-md w-full border rounded-xl p-6 shadow-sm">
-          <h1 className="text-2xl font-semibold mb-4">You’re all set ✅</h1>
-          <p className="mb-2">
-            Welcome, <span className="font-medium">{employee.name}</span>.
-          </p>
-          <p className="text-sm text-gray-600">
-            Your account is now active. You can close this page or go to the
-            hours app (we’ll wire auto-redirect later).
-          </p>
-        </div>
+        <p>Something went wrong. No invite data found.</p>
       </main>
     );
   }
@@ -155,56 +192,80 @@ function OnboardPageContent() {
   return (
     <main className="min-h-screen flex items-center justify-center">
       <div className="max-w-md w-full border rounded-xl p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold mb-4">Complete your setup</h1>
+        <h1 className="text-2xl font-semibold mb-4">Activate your account</h1>
 
         <p className="text-sm text-gray-600 mb-4">
           You&apos;re joining{" "}
           <span className="font-medium">
-            {employee.companyName ?? "your company"}
+            {invite.companyName ?? "your company"}
           </span>
           .
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
+            <label className="block text-sm font-medium mb-1">
+              Name (optional)
+            </label>
             <input
               className="w-full border rounded-md px-3 py-2 text-sm"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
+              autoComplete="name"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
+            <label className="block text-sm font-medium mb-1">Password</label>
             <input
-              className="w-full border rounded-md px-3 py-2 text-sm bg-gray-100"
-              value={employee.email ?? ""}
-              disabled
+              className="w-full border rounded-md px-3 py-2 text-sm"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 10 characters"
+              type="password"
+              autoComplete="new-password"
             />
           </div>
 
-          {submitError && (
-            <p className="text-sm text-red-600">{submitError}</p>
-          )}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Confirm password
+            </label>
+            <input
+              className="w-full border rounded-md px-3 py-2 text-sm"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              type="password"
+              autoComplete="new-password"
+            />
+          </div>
+
+          {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
           <button
             type="submit"
             disabled={submitting}
             className="w-full rounded-md px-3 py-2 text-sm font-medium border bg-black text-white disabled:opacity-60"
           >
-            {submitting ? "Saving…" : "Finish"}
+            {submitting ? "Activating…" : "Activate"}
           </button>
         </form>
       </div>
     </main>
   );
-}export default function OnboardPage() {
+}
+
+export default function OnboardPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen flex items-center justify-center"><p className="text-lg">Loading…</p></main>}>
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center">
+          <p className="text-lg">Loading…</p>
+        </main>
+      }
+    >
       <OnboardPageContent />
     </Suspense>
   );
 }
-
