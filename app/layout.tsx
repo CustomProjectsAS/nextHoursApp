@@ -28,6 +28,21 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <footer
+          style={{
+            marginTop: 48,
+            padding: 24,
+            fontSize: 14,
+            color: "#666",
+            borderTop: "1px solid #eee",
+          }}
+        >
+          <nav style={{ display: "flex", gap: 16 }}>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/dpa">DPA</a>
+          </nav>
+        </footer>
       </body>
     </html>
   );

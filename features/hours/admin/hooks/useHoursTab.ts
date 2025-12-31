@@ -53,14 +53,18 @@ export function useHoursTab(data: AdminHoursData) {
   }
 
   function empTotals(emp: AdminEmployeeHours) {
-    const totalNet = emp.entries.reduce((sum, e) => sum + (Number(e.hoursNet) || 0), 0);
+    const totalNet = (emp.entries ?? []).reduce((sum, e) => sum + (Number(e.hoursNet) || 0), 0);
     const totalBrut = totalNet;
     return { totalNet, totalBrut };
   }
 
   const monthTotals = useMemo(() => {
-    const entriesCount = uiData.employees.reduce((sum, emp) => sum + emp.entries.length, 0);
-    const totalNet = uiData.employees.reduce((sum, emp) => sum + empTotals(emp).totalNet, 0);
+    const entriesCount = (uiData?.employees ?? []).reduce(
+      (sum, emp) => sum + (emp.entries?.length ?? 0),
+      0
+    );
+
+    const totalNet = (uiData?.employees ?? []).reduce((sum, emp) => sum + empTotals(emp).totalNet, 0);
     const totalBrut = totalNet;
     return { totalNet, totalBrut, entriesCount };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,7 +76,7 @@ export function useHoursTab(data: AdminHoursData) {
 
     return {
       ...uiData,
-      employees: uiData.employees
+      employees: (uiData?.employees ?? [])
         .map((emp) => {
           const empMatch = emp.name.toLowerCase().includes(q);
           const entries = emp.entries.filter((e) => {
