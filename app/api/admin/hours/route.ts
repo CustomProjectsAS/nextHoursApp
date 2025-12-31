@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
 import { okNext, failNext } from "@/lib/api/nextResponse";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
+
 
 function parseMonth(month: string) {
   // Expect YYYY-MM
@@ -22,24 +25,28 @@ function normalizeStatus(s: string) {
 }
 
 export async function GET(req: Request) {
-  try {
-    const ctx = await getAuthContext(req);
-    if (!ctx) {
-      return failNext("AUTH_REQUIRED", "Unauthorized", 401);
-    }
+  const requestId = getOrCreateRequestId(req);
 
+  try {
+
+    const ctx = await getAuthContext(req);
+
+    if (!ctx) {
+      log.warn("AUTH_REQUIRED: admin/hours", { requestId });
+      return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
+    }
 
     if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
-      return failNext("FORBIDDEN", "Forbidden", 403);
+      log.warn("FORBIDDEN: admin/hours", { requestId, role: ctx.role });
+      return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
     }
-
 
     const { searchParams } = new URL(req.url);
 
     const monthParam = String(searchParams.get("month") ?? "").trim();
     const parsed = parseMonth(monthParam);
     if (!parsed) {
-      return failNext("VALIDATION", "month is required in YYYY-MM format", 400);
+      return failNext("VALIDATION", "month is required in YYYY-MM format", 400, undefined, requestId);
     }
 
 
@@ -51,7 +58,7 @@ export async function GET(req: Request) {
 
     if (employeeIdParam != null && employeeIdParam !== "") {
       if (!Number.isFinite(employeeId!) || employeeId! <= 0) {
-        return failNext("VALIDATION", "Invalid employeeId", 400);
+        return failNext("VALIDATION", "Invalid employeeId", 400, undefined, requestId);
       }
     }
 
@@ -72,7 +79,7 @@ export async function GET(req: Request) {
     const statusParam = searchParams.get("status");
     const status = statusParam ? normalizeStatus(statusParam) : null;
     if (statusParam && !status) {
-      return failNext("VALIDATION", "Invalid status. Use PENDING|APPROVED|REJECTED", 400);
+      return failNext("VALIDATION", "Invalid status. Use PENDING|APPROVED|REJECTED", 400, undefined, requestId);
     }
 
 
@@ -117,24 +124,33 @@ export async function GET(req: Request) {
       0,
     );
 
-    return okNext({
-      month: parsed.label,
-      filters: {
-        employeeId: employeeId ?? null,
-        status: status ?? "PENDING+REJECTED",
+    return okNext(
+      {
+        month: parsed.label,
+        filters: {
+          employeeId: employeeId ?? null,
+          status: status ?? "PENDING+REJECTED",
+        },
+        totals: {
+          entriesCount: entries.length,
+          totalNet,
+          totalBrut,
+        },
+        employees,
+        entries,
       },
-      totals: {
-        entriesCount: entries.length,
-        totalNet,
-        totalBrut,
-      },
-      employees,
-      entries,
+      undefined,
+      requestId
+    );
+
+
+    } catch (err: any) {
+    log.error("INTERNAL: admin/hours", {
+      requestId,
+      errorName: err?.name,
+      errorMessage: err?.message,
     });
-
-  } catch (err: any) {
-    console.error("GET /api/admin/hours error:", err);
-    return failNext("INTERNAL", "Internal error", 500);
-
+    return failNext("INTERNAL", "Internal error", 500, undefined, requestId);
   }
+
 }
