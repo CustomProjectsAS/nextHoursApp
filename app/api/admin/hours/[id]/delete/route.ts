@@ -1,26 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
 import { okNext, failNext } from "@/lib/api/nextResponse";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getOrCreateRequestId(req);
   const ctx = await getAuthContext(req);
   if (!ctx) {
-    return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+    log.warn("AUTH_REQUIRED: admin/hours/[id]/delete POST", { requestId });
+    return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
   }
 
   if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
-    return failNext("FORBIDDEN", "Forbidden", 403);
+    log.warn("FORBIDDEN: admin/hours/[id]/delete POST", { requestId, role: ctx.role });
+    return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
   }
 
 
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!Number.isFinite(id) || id <= 0) {
-    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400);
+    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400, undefined, requestId);
   }
+
 
 
   try {
@@ -36,9 +42,9 @@ export async function POST(
 
     if (!existing) {
       // Either not found OR already deleted (we don't leak which)
-      return failNext("NOT_FOUND", "Hour entry not found", 404);
-
+      return failNext("NOT_FOUND", "Hour entry not found", 404, undefined, requestId);
     }
+
 
     const updated = await prisma.hourEntry.update({
       where: { id },
@@ -64,11 +70,16 @@ export async function POST(
       },
     });
 
-    return okNext({ entry: updated });
+    return okNext({ entry: updated }, undefined, requestId);
 
   } catch (err: any) {
-    console.error("POST /api/admin/hours/[id]/delete error:", err);
-    return failNext("INTERNAL", "Failed to delete hour entry", 500);
+    log.error("INTERNAL: admin/hours/[id]/delete POST", {
+      requestId,
+      errorName: err?.name,
+      errorMessage: err?.message,
+    });
+    return failNext("INTERNAL", "Failed to delete hour entry", 500, undefined, requestId);
   }
+
 
 }
