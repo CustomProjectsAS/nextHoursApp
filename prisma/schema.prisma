@@ -10,32 +10,45 @@ model Company {
   id             Int             @id @default(autoincrement())
   name           String
   createdAt      DateTime        @default(now())
-  sessions       Session[]
-  employees      Employee[]
-  projects       Project[]
   activityEvents ActivityEvent[]
+  authEvents     AuthEvent[]
+  employees      Employee[]
+  hourEntries    HourEntry[]
+  projects       Project[]
+  sessions       Session[]
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  employees    Employee[]
 }
 
 model Employee {
   id              Int            @id @default(autoincrement())
   name            String
   email           String?
-  passwordHash    String?
   companyId       Int?
   status          EmployeeStatus @default(INVITED)
-  sessions        Session[]
   role            EmployeeRole   @default(EMPLOYEE)
-  inviteToken     String?        @unique
   inviteExpiresAt DateTime?
   invitedAt       DateTime?
   onboardedAt     DateTime?
   lastLoginAt     DateTime?
   isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
+  passwordHash    String?
+  userId          Int?
+  inviteTokenHash String?        @unique
   company         Company?       @relation(fields: [companyId], references: [id])
+  user            User?          @relation(fields: [userId], references: [id])
   hours           HourEntry[]
+  sessions        Session[]
 
   @@unique([companyId, email])
+  @@index([userId])
 }
 
 model Project {
@@ -59,33 +72,95 @@ model HourEntry {
   breakMinutes Int        @default(0)
   hoursNet     Decimal    @db.Decimal(5, 2)
   hoursBrut    Decimal?   @db.Decimal(5, 2)
-  rejectReason String?
   description  String?
   status       HourStatus @default(PENDING)
   createdAt    DateTime   @default(now())
+  rejectReason String?
+  companyId    Int
+  deletedAt    DateTime?
+  company      Company    @relation(fields: [companyId], references: [id])
   employee     Employee   @relation(fields: [employeeId], references: [id])
   project      Project?   @relation(fields: [projectId], references: [id])
+
+  @@index([companyId, workDate])
+  @@index([companyId, employeeId, workDate])
 }
 
 model Session {
-  id         Int    @id @default(autoincrement())
-  tokenHash  String @unique
+  id         Int       @id @default(autoincrement())
+  tokenHash  String    @unique
   employeeId Int
   companyId  Int
-
   createdAt  DateTime  @default(now())
   expiresAt  DateTime
   revokedAt  DateTime?
   lastUsedAt DateTime?
-
-  ip        String?
-  userAgent String?
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ip         String?
+  userAgent  String?
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([companyId, expiresAt])
   @@index([employeeId, expiresAt])
+}
+
+model ActivityEvent {
+  id         Int        @id @default(autoincrement())
+  companyId  Int
+  createdAt  DateTime   @default(now())
+  actorType  ActorType
+  actorId    Int?
+  actorName  String?
+  entityType EntityType
+  entityId   Int?
+  eventType  EventType
+  summary    String?
+  meta       Json?
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@index([companyId, eventType, createdAt])
+  @@index([companyId, actorType, actorId, createdAt])
+  @@index([companyId, entityType, entityId, createdAt])
+}
+
+model AuthEvent {
+  id          Int             @id @default(autoincrement())
+  createdAt   DateTime        @default(now())
+  companyId   Int?
+  actorId     Int?
+  actorType   ActorType?
+  actorName   String?
+  type        AuthEventType
+  ok          Boolean
+  emailHash   String?
+  ipHash      String?
+  userAgent   String?
+  windowStart DateTime
+  count       Int             @default(1)
+  reason      AuthFailReason?
+  meta        Json?
+  company     Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([type, companyId, emailHash, ipHash, windowStart, reason])
+  @@index([createdAt])
+  @@index([companyId, createdAt])
+  @@index([emailHash, windowStart])
+  @@index([ipHash, windowStart])
+  @@index([type, windowStart])
+}
+
+model RateLimitBucket {
+  id          Int      @id @default(autoincrement())
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([key, windowStart])
+  @@index([key])
+  @@index([windowStart])
 }
 
 enum HourStatus {
@@ -106,30 +181,6 @@ enum EmployeeRole {
   OWNER
 }
 
-model ActivityEvent {
-  id        Int      @id @default(autoincrement())
-  companyId Int
-  createdAt DateTime @default(now())
-
-  actorType ActorType
-  actorId   Int? // null = SYSTEM
-  actorName String? // optional snapshot for readability
-
-  entityType EntityType
-  entityId   Int? // null for global events like LOGIN
-
-  eventType EventType
-  summary   String? // human-friendly line
-  meta      Json?     @db.JsonB // structured payload: prev/next/reason/etc.
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId, createdAt])
-  @@index([companyId, eventType, createdAt])
-  @@index([companyId, actorType, actorId, createdAt])
-  @@index([companyId, entityType, entityId, createdAt])
-}
-
 enum ActorType {
   EMPLOYEE
   ADMIN
@@ -146,7 +197,6 @@ enum EntityType {
 }
 
 enum EventType {
-  // Hours
   HOUR_CREATED
   HOUR_EDITED
   HOUR_SUBMITTED
@@ -154,17 +204,29 @@ enum EventType {
   HOUR_REJECTED
   HOUR_REOPENED
   HOUR_SUPERSEDED
-
-  // Auth / presence
   LOGIN
   LOGOUT
-
-  // Management
   EMPLOYEE_INVITED
   EMPLOYEE_ACTIVATED
   EMPLOYEE_DISABLED
-
   PROJECT_CREATED
   PROJECT_UPDATED
   PROJECT_DISABLED
+  HOUR_DELETED
+}
+
+enum AuthEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAIL
+  LOGOUT
+}
+
+enum AuthFailReason {
+  BAD_PASSWORD
+  UNKNOWN_EMAIL
+  DISABLED
+  NOT_ACTIVE
+  NO_PASSWORD
+  MULTI_COMPANY_CHALLENGE
+  CHALLENGE_INVALID
 }

@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# local artifacts
+auth-cookie-verify.zip
+hours-app-context.zip
+cookies.txt
+

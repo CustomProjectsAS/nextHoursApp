@@ -1,31 +1,67 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createActivityEvent } from "@/features/activity/createActivityEvent";
+import { getAuthContext } from "@/lib/auth";
+import { okNext, failNext } from "@/lib/api/nextResponse";
+
+
 
 
 // small helper: "HH:MM" -> minutes from midnight
+// strict helper: "HH:MM" -> minutes from midnight (00:00..23:59)
 function parseTimeToMinutes(time: string | null | undefined): number | null {
   if (!time) return null;
-  const [hStr, mStr] = time.split(":");
-  const h = Number(hStr);
-  const m = Number(mStr);
-  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return h * 60 + m;
+  const t = String(time).trim();
+
+  // must be exactly HH:MM
+  const m = /^(\d{2}):(\d{2})$/.exec(t);
+  if (!m) return null;
+
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+
+  if (!Number.isInteger(h) || !Number.isInteger(min)) return null;
+  if (h < 0 || h > 23) return null;
+  if (min < 0 || min > 59) return null;
+
+  return h * 60 + min;
 }
+
 
 function calculateHours(
   fromTime: string,
   toTime: string,
   breakMinutes: number | null | undefined
 ) {
+
   const start = parseTimeToMinutes(fromTime);
-  const end = parseTimeToMinutes(toTime);
-  if (start == null || end == null || end <= start) {
+  const endRaw = parseTimeToMinutes(toTime);
+  if (start == null || endRaw == null) {
     throw new Error("Invalid from/to times");
   }
 
+  // Overnight support: toTime earlier than fromTime => next day
+  const end = endRaw < start ? endRaw + 24 * 60 : endRaw;
+
+  if (end <= start) {
+    throw new Error("Invalid from/to times");
+  }
+
+
   const breakMin = breakMinutes ?? 0;
-  const rawMinutes = end - start - breakMin;
+  if (!Number.isFinite(breakMin) || breakMin < 0) {
+    throw new Error("Invalid breakMinutes");
+  }
+
+  const durationMinutes = end - start;
+  if (breakMin >= durationMinutes) {
+    throw new Error("Break is too long for the given time range");
+  }
+
+  const rawMinutes = durationMinutes - breakMin;
+  const MAX_SHIFT_MINUTES = 16 * 60; // 16 hours cap (adjust later if your business needs it)
+  if (durationMinutes > MAX_SHIFT_MINUTES) {
+    throw new Error("Shift is too long");
+  }
+
   if (rawMinutes <= 0) {
     throw new Error("Break is too long for the given time range");
   }
@@ -41,40 +77,41 @@ function calculateHours(
 }
 
 // PATCH /api/admin/hours/[id]  -> update an entry
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const ctx = await getAuthContext(req);
+  if (!ctx) {
+    return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+  }
+
+  if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
+    return failNext("FORBIDDEN", "Forbidden", 403);
+  }
+
+
   const { id: idParam } = await params;
   const id = Number(idParam);
-
-  if (Number.isNaN(id)) {
-    return NextResponse.json(
-      { error: `Invalid id (got: ${idParam})` },
-      { status: 400 }
-    );
+  if (!Number.isFinite(id) || id <= 0) {
+    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400);
   }
+
 
   try {
 
-    const existing = await prisma.hourEntry.findUnique({
-      where: { id },
-      include: {
-        employee: {
-          select: {
-            companyId: true,
-          },
-        },
+    const existing = await prisma.hourEntry.findFirst({
+      where: {
+        id,
+        companyId: ctx.companyId,
+        deletedAt: null,
       },
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Hour entry not found" },
-        { status: 404 }
-      );
+      return failNext("NOT_FOUND", "Hour entry not found", 404);
     }
 
+    if (existing.status === "APPROVED") {
+      return failNext("FORBIDDEN", "Entry is approved and cannot be edited.", 409);
+    }
 
     const body = await req.json();
 
@@ -84,19 +121,16 @@ export async function PATCH(
       breakMinutes,
       projectId,
       description,
-      status,
       workDate,
-      rejectReason,
     } = body as {
       fromTime?: string;
       toTime?: string;
       breakMinutes?: number;
       projectId?: number | null;
       description?: string;
-      status?: "PENDING" | "APPROVED" | "REJECTED" | "pending" | "approved" | "rejected";
       workDate?: string;
-      rejectReason?: string;
     };
+
 
 
     const data: any = {};
@@ -104,113 +138,39 @@ export async function PATCH(
     if (fromTime !== undefined) data.fromTime = fromTime;
     if (toTime !== undefined) data.toTime = toTime;
     if (breakMinutes !== undefined) data.breakMinutes = breakMinutes;
-    if (projectId !== undefined) data.projectId = projectId;
-    if (description !== undefined) data.description = description;
-    if (rejectReason !== undefined) data.rejectReason = rejectReason;
-
-
-    if (status !== undefined) {
-      const normalized =
-        status === "approved"
-          ? "APPROVED"
-          : status === "rejected"
-            ? "REJECTED"
-            : status === "pending"
-              ? "PENDING"
-              : status;
-
-      data.status = normalized;
-      if (normalized === "REJECTED") {
-        const reason = String(rejectReason ?? "").trim();
-        if (!reason) {
-          return NextResponse.json(
-            { error: "Reject reason is required" },
-            { status: 400 }
-          );
-        }
-        data.rejectReason = reason;
+    if (projectId !== undefined) {
+      if (projectId == null) {
+        return failNext("VALIDATION", "projectId is required", 400);
       }
 
-      // Optional cleanup: if not rejected, clear rejectReason when status explicitly changes
-      if (normalized !== "REJECTED") {
-        data.rejectReason = null;
+
+      const proj = await prisma.project.findFirst({
+        where: { id: projectId, companyId: ctx.companyId },
+        select: { id: true },
+      });
+
+      if (!proj) {
+        return failNext("VALIDATION", "Invalid projectId for this company", 400);
       }
 
+
+      data.projectId = projectId;
     }
+
+    if (description !== undefined) data.description = description;
+
 
     if (workDate !== undefined) {
       // treat as local date, no timezone shift
       data.workDate = new Date(workDate + "T00:00:00");
     }
-    // Auto-flip: if admin edited anything (without explicitly setting status)
-    // and entry was approved → go back to PENDING
-    if (status === undefined && Object.keys(data).length > 0) {
-      if (existing.status === "APPROVED") {
-        data.status = "PENDING";
-      }
-    }
 
-
-    const prevStatus = existing.status;
-    const nextStatus =
-      (data.status ?? existing.status) as "PENDING" | "APPROVED" | "REJECTED";
-
-    const statusChanged = prevStatus !== nextStatus;
-
-    const shouldLog =
-      statusChanged &&
-      (nextStatus === "APPROVED" ||
-        nextStatus === "REJECTED" ||
-        (nextStatus === "PENDING" && prevStatus !== "PENDING")); // REOPENED
-
-    if (shouldLog) {
-      const isReopened =
-        nextStatus === "PENDING" && prevStatus !== "PENDING";
-
-
-      if (!existing.employee.companyId) {
-        throw new Error("Employee has no companyId");
-      }
-
-
-      await createActivityEvent({
-        companyId: existing.employee.companyId,
-
-        actorType: "SYSTEM",
-        actorId: null,
-        actorName: "System",
-
-        entityType: "HOUR_ENTRY",
-        entityId: existing.id,
-
-        eventType: isReopened
-          ? "HOUR_REOPENED"
-          : nextStatus === "APPROVED"
-            ? "HOUR_APPROVED"
-            : "HOUR_REJECTED",
-
-
-        summary: isReopened
-          ? `Hour entry ${existing.id} reopened (${prevStatus} → PENDING)`
-          : `Hour entry ${existing.id} ${prevStatus} → ${nextStatus}`,
-
-        meta: {
-          prevStatus,
-          newStatus: nextStatus,
-          rejectReason:
-            nextStatus === "REJECTED"
-              ? (data.rejectReason ?? existing.rejectReason ?? null)
-              : null,
-        },
-      });
-
-    }
-
-
-
+    // Admin edit rule: always reopen to PENDING + clear rejectReason
+    data.status = "PENDING";
+    data.rejectReason = null;
 
     // If any of the time-related fields changed, recalc hours
-    if (fromTime || toTime || breakMinutes !== undefined) {
+    if (fromTime !== undefined || toTime !== undefined || breakMinutes !== undefined) {
       const newFrom = fromTime ?? existing.fromTime;
       const newTo = toTime ?? existing.toTime;
       const newBreak =
@@ -227,40 +187,104 @@ export async function PATCH(
       data,
     });
 
-    return NextResponse.json(updated);
+    await prisma.activityEvent.create({
+      data: {
+        companyId: ctx.companyId,
+        actorType: "EMPLOYEE",
+        actorId: ctx.employeeId,
+        actorName: ctx.name ?? null,
+        entityType: "HOUR_ENTRY",
+        entityId: updated.id,
+        eventType: "HOUR_EDITED",
+        summary: `Edited hour entry #${updated.id}`,
+        meta: {
+          prev: {
+            workDate: existing.workDate,
+            fromTime: existing.fromTime,
+            toTime: existing.toTime,
+            breakMinutes: existing.breakMinutes,
+            projectId: existing.projectId,
+            description: existing.description,
+            status: existing.status,
+            rejectReason: existing.rejectReason,
+            hoursNet: existing.hoursNet,
+            hoursBrut: existing.hoursBrut,
+          },
+          next: {
+            workDate: updated.workDate,
+            fromTime: updated.fromTime,
+            toTime: updated.toTime,
+            breakMinutes: updated.breakMinutes,
+            projectId: updated.projectId,
+            description: updated.description,
+            status: updated.status,
+            rejectReason: updated.rejectReason,
+            hoursNet: updated.hoursNet,
+            hoursBrut: updated.hoursBrut,
+          },
+          changed: Object.keys(data),
+        },
+      },
+    });
+
+    return okNext(updated);
+
+
+
   } catch (err: any) {
     console.error("PATCH /api/admin/hours/[id] error:", err);
-    return NextResponse.json(
-      { error: err.message ?? "Unknown error" },
-      { status: 500 }
-    );
+    return failNext("INTERNAL", err?.message ?? "Unknown error", 500);
   }
 }
 
-// DELETE /api/admin/hours/[id]  -> delete an entry
+
+
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const ctx = await getAuthContext(req);
+  if (!ctx) {
+    return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+  }
+
+  if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
+    return failNext("FORBIDDEN", "Forbidden", 403);
+  }
+
   const { id: idParam } = await params;
   const id = Number(idParam);
 
-  if (Number.isNaN(id)) {
-    return NextResponse.json(
-      { error: `Invalid id (got: ${idParam})` },
-      { status: 400 }
-    );
+  if (!Number.isFinite(id) || id <= 0) {
+    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400);
   }
 
   try {
-    await prisma.hourEntry.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    const existing = await prisma.hourEntry.findFirst({
+      where: {
+        id,
+        companyId: ctx.companyId,
+      },
+      select: { id: true, deletedAt: true },
+    });
 
+    if (!existing) {
+      return failNext("NOT_FOUND", "Hour entry not found", 404);
+    }
+
+    if (existing.deletedAt) {
+      return okNext({ alreadyDeleted: true });
+    }
+
+    await prisma.hourEntry.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    return okNext({ deleted: true });
   } catch (err: any) {
     console.error("DELETE /api/admin/hours/[id] error:", err);
-    return NextResponse.json(
-      { error: err.message ?? "Unknown error" },
-      { status: 500 }
-    );
+    return failNext("INTERNAL", err?.message ?? "Unknown error", 500);
   }
 }
+
