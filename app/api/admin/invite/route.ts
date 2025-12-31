@@ -5,9 +5,8 @@ import { getAuthContext } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 import { okNext, failNext } from "@/lib/api/nextResponse";
 import { z } from "zod";
-
-
-
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
 
 
 function generateInviteToken() {
@@ -31,22 +30,25 @@ const InviteBodySchema = z
 
 export async function POST(req: Request) {
 
+    const requestId = getOrCreateRequestId(req);
     const ctx = await getAuthContext(req);
     if (!ctx) {
-        return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+        log.warn("AUTH_REQUIRED: admin/invite POST", { requestId });
+        return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
     }
 
     if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
-        return failNext("FORBIDDEN", "Forbidden", 403);
+        log.warn("FORBIDDEN: admin/invite POST", { requestId, role: ctx.role });
+        return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
     }
+
 
     const body = await req.json().catch(() => null);
     const parsed = InviteBodySchema.safeParse(body);
 
     if (!parsed.success) {
-        return failNext("VALIDATION", "Invalid request body", 400);
+        return failNext("VALIDATION", "Invalid request body", 400, undefined, requestId);
     }
-
 
     const { name, email, role } = parsed.data;
 
@@ -64,9 +66,10 @@ export async function POST(req: Request) {
         windowSeconds: 600,
         limit: 30,
     });
-    if (!ipLimit.ok) {
-        return failNext("RATE_LIMIT", "Too many invites. Try again later.", 429);
+       if (!ipLimit.ok) {
+        return failNext("RATE_LIMIT", "Too many invites. Try again later.", 429, undefined, requestId);
     }
+
 
 
     // Actor-based: 20 invites / 10 minutes (per employee)
@@ -76,10 +79,9 @@ export async function POST(req: Request) {
         windowSeconds: 600,
         limit: 20,
     });
-    if (!actorLimit.ok) {
-        return failNext("RATE_LIMIT", "Too many invites. Try again later.", 429);
+        if (!actorLimit.ok) {
+        return failNext("RATE_LIMIT", "Too many invites. Try again later.", 429, undefined, requestId);
     }
-
 
     try {
 
@@ -144,25 +146,31 @@ export async function POST(req: Request) {
         const inviteUrl = `${baseUrl}/onboarding?token=${inviteTokenRaw}`;
 
 
-        return okNext({
+                return okNext(
+          {
             employeeId: employee.id,
             inviteLink: inviteUrl,
             expiresAt: employee.inviteExpiresAt,
-        });
+          },
+          undefined,
+          requestId
+        );
 
 
     } catch (error: any) {
-        console.error("POST /api/admin/invite error:", error);
+        log.error("INTERNAL: admin/invite POST", {
+            requestId,
+            errorName: error?.name,
+            errorMessage: error?.message,
+            errorCode: error?.code,
+        });
 
-
-        /// Prisma unique constraint on email or inviteTokenHash
-
-                if (error?.code === "P2002") {
-            return failNext("BAD_REQUEST", "Invite conflict", 409);
+        // Prisma unique constraint (e.g., email)
+        if (error?.code === "P2002") {
+            return failNext("BAD_REQUEST", "Invite conflict", 409, undefined, requestId);
         }
 
-
-                return failNext("INTERNAL", "Internal server error", 500);
-
+        return failNext("INTERNAL", "Internal server error", 500, undefined, requestId);
     }
+
 }

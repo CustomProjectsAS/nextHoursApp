@@ -181,7 +181,7 @@ Rule for each API route (to mark [x]):
 
 ### Admin routes
 - [x] app/api/admin/dashboard/route.ts
-- [ ] app/api/admin/invite/route.ts
+- [x] app/api/admin/invite/route.ts
 - [x] app/api/admin/hours/route.ts
 - [x] app/api/admin/hours/[id]/route.ts
 - [ ] app/api/admin/hours/[id]/approve/route.ts
