@@ -188,7 +188,7 @@ Rule for each API route (to mark [x]):
 - [x] app/api/admin/hours/[id]/reject/route.ts
 - [x] app/api/admin/hours/[id]/delete/route.ts
 - [ ] app/api/admin/employees/route.ts
-- [ ] app/api/admin/employees/[id]/disable/route.ts
+- [x] app/api/admin/employees/[id]/disable/route.ts
 - [ ] app/api/admin/projects/route.ts
 - [ ] app/api/admin/projects/[id]/route.ts
 - [ ] app/api/admin/projects/[id]/disable/route.ts
