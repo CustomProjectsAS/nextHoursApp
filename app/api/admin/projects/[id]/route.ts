@@ -1,27 +1,37 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
 import { okNext, failNext } from "@/lib/api/nextResponse";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
+
 
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getOrCreateRequestId(req);
   const ctx = await getAuthContext(req);
- if (!ctx) {
-  return failNext("AUTH_REQUIRED", "Unauthorized", 401);
-}
+  if (!ctx) {
+    log.warn("AUTH_REQUIRED: admin/projects/[id] PATCH", { requestId });
+    return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
+  }
+
 
   if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
-  return failNext("FORBIDDEN", "Forbidden", 403);
-}
+    log.warn("FORBIDDEN: admin/projects/[id] PATCH", { requestId, role: ctx.role });
+    return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
+  }
+
 
 
   const { id: idParam } = await params;
   const projectId = Number(idParam);
   if (!Number.isFinite(projectId) || projectId <= 0) {
-  return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400);
-}
+    log.warn("VALIDATION: admin/projects/[id] PATCH (id)", { requestId, idParam });
+    return failNext("VALIDATION", `Invalid id (got: ${idParam})`, 400, undefined, requestId);
+  }
+
 
 
   try {
@@ -30,8 +40,9 @@ export async function PATCH(
     const colorRaw = body?.color;
 
     if (nameRaw === undefined && colorRaw === undefined) {
-  return failNext("VALIDATION", "Nothing to update", 400);
-}
+      log.warn("VALIDATION: admin/projects/[id] PATCH (no fields)", { requestId, projectId });
+      return failNext("VALIDATION", "Nothing to update", 400, undefined, requestId);
+    }
 
 
     const existing = await prisma.project.findFirst({
@@ -48,8 +59,10 @@ export async function PATCH(
     });
 
     if (!existing) {
-  return failNext("NOT_FOUND", "Project not found", 404);
-}
+      log.warn("NOT_FOUND: admin/projects/[id] PATCH", { requestId, projectId });
+      return failNext("NOT_FOUND", "Project not found", 404, undefined, requestId);
+    }
+
 
 
     const nextData: { name?: string; color?: string | null } = {};
@@ -65,9 +78,10 @@ export async function PATCH(
       changed.color = { from: existing.color, to: nextData.color };
     }
 
-    if (Object.keys(changed).length === 0) {
-  return okNext({ noChanges: true });
-}
+        if (Object.keys(changed).length === 0) {
+      return okNext({ noChanges: true }, undefined, requestId);
+    }
+
 
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -96,11 +110,18 @@ export async function PATCH(
       return proj;
     });
 
-    return okNext({ project: updated });
+        return okNext({ project: updated }, undefined, requestId);
 
-  } catch (err: any) {
-  console.error("PATCH /api/admin/projects/[id] error:", err);
-  return failNext("INTERNAL", "Failed to update project", 500);
-}
+
+    } catch (err: any) {
+    log.error("INTERNAL: admin/projects/[id] PATCH", {
+      requestId,
+      projectId,
+      errorName: err?.name,
+      errorMessage: err?.message,
+    });
+    return failNext("INTERNAL", "Failed to update project", 500, undefined, requestId);
+  }
+
 
 }
