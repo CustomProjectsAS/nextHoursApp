@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createLoginChallenge } from "@/lib/auth";
+import { POST } from "./route";
+
 
 describe("POST /api/auth/login/choose-company — happy path", () => {
     // scoped cleanup IDs to avoid cross-test nuking
@@ -66,7 +68,7 @@ describe("POST /api/auth/login/choose-company — happy path", () => {
         });
 
         // --- Act ---
-        const res = await fetch("http://localhost:3000/api/auth/login/choose-company", {
+                const req = new Request("http://test/api/auth/login/choose-company", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -74,6 +76,9 @@ describe("POST /api/auth/login/choose-company — happy path", () => {
                 companyId: company.id,
             }),
         });
+
+        const res = await POST(req);
+
         const text = await res.text();
         if (res.status !== 200) {
             console.log("choose-company status:", res.status);
@@ -104,5 +109,6 @@ describe("POST /api/auth/login/choose-company — happy path", () => {
             },
         });
         process.env.AUTH_SECRET = prevSecret;
+
     });
 });

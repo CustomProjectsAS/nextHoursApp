@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { POST } from "./route";
+
 
 describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
   let createdCompanyId: number | null = null;
@@ -61,16 +63,13 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     createdEmployeeId = employee.id;
 
     // --- Act ---
-    const res = await fetch("http://localhost:3000/api/auth/login", {
+    const req = new Request("http://test/api/auth/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: user.email,
-        password,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email, password }),
     });
+    const res = await POST(req);
+
 
     const text = await res.text();
     if (res.status !== 200) {
@@ -104,7 +103,7 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     });
 
   });
-    it("returns 401 INVALID_CREDENTIALS and does not set session cookie (wrong password)", async () => {
+  it("returns 401 INVALID_CREDENTIALS and does not set session cookie (wrong password)", async () => {
     // --- Arrange (minimal fixture) ---
     const correctPassword = "correct-password";
     const wrongPassword = "wrong-password";
@@ -136,14 +135,44 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     createdEmployeeId = employee.id;
 
     // --- Act ---
-    const res = await fetch("http://localhost:3000/api/auth/login", {
+    const req = new Request("http://test/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email, password: wrongPassword }),
+    });
+    const res = await POST(req);
+
+    const text = await res.text();
+    const body = JSON.parse(text);
+
+    // --- Assert: HTTP + headers ---
+    expect(res.status).toBe(401);
+    const requestId = res.headers.get("x-request-id");
+    expect(requestId).toBeTruthy();
+
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie ?? "").not.toContain("cph_session=");
+
+    // --- Assert: body ---
+    expect(body.ok).toBe(false);
+    expect(body.error?.code).toBe("INVALID_CREDENTIALS");
+    expect(body.error?.requestId).toBe(requestId);
+  });
+  it("returns 401 INVALID_CREDENTIALS and does not set session cookie (unknown email)", async () => {
+    // --- Arrange ---
+    const password = "any-password";
+
+    // --- Act ---
+    const req = new Request("http://test/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: user.email,
-        password: wrongPassword,
+        email: `no-such-user+${Date.now()}@test.com`,
+        password,
       }),
     });
+    const res = await POST(req);
+
 
     const text = await res.text();
     const body = JSON.parse(text);
