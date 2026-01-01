@@ -231,8 +231,8 @@ Rule for each API route (to mark [x]):
 ### 3.3 Critical route tests (minimal but real)
 - [x] Admin: GET /api/admin/dashboard returns 401 AUTH_REQUIRED + requestId
 
-- [/] Auth
-  - [/] login
+- [x] Auth
+  - [x] login
     - [x] happy path
     - [x] wrong password → 401 INVALID_CREDENTIALS, no session cookie
     - [x] unknown email → 401 INVALID_CREDENTIALS, no session cookie
@@ -255,8 +255,8 @@ Rule for each API route (to mark [x]):
     - [x] invalid/expired token
     - [x] already active / already completed path (if applicable)
 
-- [ ] Hours (pick minimum routes first)
-  - [ ] employee: POST /api/employee/hours (create) happy path
+- [/] Hours (pick minimum routes first)
+  - [x] employee: POST /api/employee/hours (create) happy path
   - [ ] employee: PATCH /api/employee/hours/[id] (update) happy path
   - [ ] admin: POST /api/admin/hours/[id]/approve happy path
   - [ ] admin: POST /api/admin/hours/[id]/reject happy path
