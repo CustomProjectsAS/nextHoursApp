@@ -191,5 +191,42 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     expect(body.error?.code).toBe("INVALID_CREDENTIALS");
     expect(body.error?.requestId).toBe(requestId);
   });
+  it("rate-limit (email) -> 429 RATE_LIMIT + Retry-After + requestId", async () => {
+    const email = `rate-limit-email+${Date.now()}@test.com`;
+    const password = "wrong-password";
 
+    for (let i = 0; i < 11; i++) {
+      const req = new Request("http://test/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const res = await POST(req);
+
+      if (i < 10) {
+        // unknown email path => INVALID_CREDENTIALS (still consumes attempts)
+        expect(res.status).toBe(401);
+      } else {
+        expect(res.status).toBe(429);
+
+        const requestId = res.headers.get("x-request-id");
+        expect(requestId).toBeTruthy();
+
+        const retryAfter = res.headers.get("Retry-After");
+        expect(retryAfter).toBeTruthy();
+
+        const text = await res.text();
+        const body = JSON.parse(text);
+
+        expect(body.ok).toBe(false);
+        expect(body.error?.code).toBe("RATE_LIMIT");
+        expect(body.error?.requestId).toBe(requestId);
+
+        return; // stop once we hit the limiter
+      }
+    }
+
+    throw new Error("Expected login email rate-limit to trigger on attempt #11");
+  }, 30_000);
 });
