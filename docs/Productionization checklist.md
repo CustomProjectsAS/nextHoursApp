@@ -239,7 +239,8 @@ Rule for each API route (to mark [x]):
     - [ ] rate-limit / edge failures not tested
   - [x] logout
   - [x] choose-company happy path
-  - [ ] signup not tested
+  - [x] signup tested (happy path + duplicate email + rate limit)
+  
 
 - [/] Onboarding
   - [x] validate
