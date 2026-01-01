@@ -236,13 +236,13 @@ Rule for each API route (to mark [x]):
     - [x] happy path
     - [x] wrong password → 401 INVALID_CREDENTIALS, no session cookie
     - [x] unknown email → 401 INVALID_CREDENTIALS, no session cookie
-    - [ ] rate-limit / edge failures not tested
+    - [x] rate-limit / edge failures not tested
   - [x] logout
   - [x] choose-company happy path
   - [x] signup tested (happy path + duplicate email + rate limit)
   
 
-- [/] Onboarding
+- [x] Onboarding
   - [x] validate
     - [x] happy path
     - [x] expired token → 400 BAD_REQUEST
