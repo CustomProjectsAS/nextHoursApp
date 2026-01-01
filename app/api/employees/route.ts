@@ -1,12 +1,19 @@
 import { okNext, failNext } from "@/lib/api/nextResponse";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
+
 
 export async function GET(req: Request) {
+  const requestId = getOrCreateRequestId(req);
+
   try {
     const ctx = await getAuthContext(req);
+
     if (!ctx) {
-      return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+      log.warn("AUTH_REQUIRED: employees GET", { requestId });
+      return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
 
     }
 
@@ -19,11 +26,14 @@ export async function GET(req: Request) {
       select: { id: true, name: true, status: true },
     });
 
-   return okNext({ employees });
+    return okNext({ employees }, undefined, requestId);
 
-  } catch (error) {
-  console.error("[GET /api/employees] Error:", error);
-  return failNext("INTERNAL", "Failed to load employees", 500);
-}
-
+    } catch (error: any) {
+    log.error("INTERNAL: employees GET", {
+      requestId,
+      errorName: error?.name,
+      errorMessage: error?.message,
+    });
+    return failNext("INTERNAL", "Failed to load employees", 500, undefined, requestId);
+  }
 }
