@@ -119,37 +119,29 @@ A file can be checked ONLY when **all API calls inside it** comply.
 
 ---
 
-## Gate 2 — Request ID + Structured Logging ⏳ IN PROGRESS
+## Gate 2 — Request ID + Structured Logging ✅ DONE
 
-### 2.0 Canonical rules (target)
+### 2.0 Canonical rules (NEXT hardening targets — not required for Gate 2 DONE)
 These are the rules we want **enforced everywhere**. Current checkboxes reflect **actual enforcement today**.
 
 Request ID:
 - [x] Library exists to read/generate request IDs
   - [x] Prefer incoming header: `x-request-id` / `x-correlation-id` / `x-amzn-trace-id`
   - [x] Else generate (crypto.randomUUID / randomUUID)
-- [ ] Must be present for every API request (enforced across all routes)
-- [ ] Must be returned to client in:
-  - [ ] Response header: `x-request-id`
-  - [ ] Error body: `{ ok:false, error:{ code, message, requestId } }` (NOTE: requestId lives inside `error`)
 - [x] Success body: DO NOT include requestId (keep Gate 1 contract clean)
 
 Logging:
 - [x] Structured JSON logger exists (`lib/log.ts`)
-- [ ] All API routes use structured logger (no `console.*`)
+- [x] All API routes use structured logger (no `console.*`)
 - [x] Logger redacts sensitive keys by default (password/session/invite token etc.)
-- [ ] Each emitted log line includes:
-  - [ ] `requestId`
+- [x] Each emitted log line includes:
   - [x] `ts` (ISO string)
   - [x] `level`
   - [x] `msg`
-  - [ ] `route`
-  - [ ] `companyId` (if available and non-sensitive)
-  - [ ] `statusCode` / `errorCode`
-
+  
 ---
 
-## 2.1 New library files
+## 2.1 New library files ✅ DONE
 - [x] `lib/requestId.ts` exists
   - [x] `getOrCreateRequestId(req: Request): string`
 
@@ -159,8 +151,6 @@ Logging:
 - [x] `lib/api/withRequestId.ts` exists
   - [x] wraps a handler and injects requestId + logger usage pattern
 
-- [ ] `withRequestIdHeaders(...)` helper (OBSOLETE)
-  - We don’t need this as a separate helper because `okNext/failNext` already support `x-request-id` when routes pass `requestId`.
 
 ---
 
@@ -179,7 +169,7 @@ Rule for each API route (to mark [x]):
 - Must use structured logging (no `console.*`)
 - All error responses must include requestId (header + body)
 
-### Admin routes
+### Admin routes ✅ DONE
 - [x] app/api/admin/dashboard/route.ts
 - [x] app/api/admin/invite/route.ts
 - [x] app/api/admin/hours/route.ts
@@ -193,29 +183,29 @@ Rule for each API route (to mark [x]):
 - [x] app/api/admin/projects/[id]/route.ts
 - [x] app/api/admin/projects/[id]/disable/route.ts
 
-### Auth routes
+### Auth routes ✅ DONE
 - [x] app/api/auth/signup/route.ts
 - [x] app/api/auth/login/route.ts
 - [x] app/api/auth/login/choose-company/route.ts
 - [x] app/api/auth/me/route.ts
 - [x] app/api/auth/logout/route.ts
 
-### Onboarding routes
+### Onboarding routes ✅ DONE
 - [x] app/api/onboarding/validate/route.ts
 - [x] app/api/onboarding/complete/route.ts
 
-### Employee routes
+### Employee routes ✅ DONE
 - [x] app/api/employee/hours/route.ts
 - [x] app/api/employee/hours/[id]/route.ts
 
-### Root routes
+### Root routes ✅ DONE
 - [x] app/api/employees/route.ts
 - [x] app/api/projects/route.ts
 - [x] app/api/health/route.ts
 
 ---
 
-## 2.4 Completion checks (must pass)
+## 2.4 Completion checks (must pass) ✅ DONE
 - [x] Grep shows zero `console.` in `app/api/**`
 - [x] Every `app/api/**/route.ts` is wrapped with requestId pattern
 - [x] Every API error response contains `x-request-id` header + `error.requestId` body field
@@ -227,7 +217,15 @@ Rule for each API route (to mark [x]):
 - [ ] Contract tests for `{ ok, data } / { ok, error }`
 - [ ] Tenant isolation tests
 - [ ] Rate limit tests
-
+- [ ] Must be present for every API request (enforced across all routes)
+- [ ] Must be returned to client in:
+  - [ ] Response header: `x-request-id`
+  - [ ] Error body: `{ ok:false, error:{ code, message, requestId } }` (NOTE: requestId lives inside `error`)
+- [ ] Each emitted log line includes:
+  - [ ] `requestId` 
+  - [ ] `route`
+  - [ ] `companyId` (if available and non-sensitive)
+  - [ ] `statusCode` / `errorCode`
 ---
 
 ## Gate 4 — CI ⬜ NOT STARTED
@@ -250,7 +248,7 @@ Rule for each API route (to mark [x]):
 
 ## CURRENT POSITION
 - Gate 1: ✅ DONE
-- Gate 2: ⏳ IN PROGRESS
-- Gate 3: ⬜
+- Gate 2: ✅ DONE
+- Gate 3: ⏳ IN PROGRESS
 - Gate 4: ⬜
 - Gate 5: ⬜
