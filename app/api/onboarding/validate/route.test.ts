@@ -1,7 +1,19 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { rateLimit } from "@/lib/rateLimit";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+vi.mock("@/lib/rateLimit", () => {
+  return {
+    rateLimit: vi.fn(async () => ({
+      ok: true,
+      resetAt: new Date(Date.now() + 60_000),
+    })),
+  };
+});
 import { GET } from "./route";
+
+
+
 
 function sha256Hex(input: string) {
   return crypto.createHash("sha256").update(input).digest("hex");
@@ -257,4 +269,52 @@ describe("GET /api/onboarding/validate", () => {
       },
     });
   });
+
+  it("rate-limit exceeded → 429 RATE_LIMIT + Retry-After + requestId", async () => {
+    // --- Arrange ---
+    vi.mocked(rateLimit).mockResolvedValueOnce({
+      ok: false,
+      limit: 20,
+      remaining: 0,
+      resetAt: new Date(Date.now() + 30_000),
+    });
+
+
+    const token = `rate-${crypto.randomUUID()}-${Date.now()}`;
+
+    // --- Act ---
+    const req = new Request(
+      `http://test/api/onboarding/validate?token=${encodeURIComponent(token)}`,
+      { method: "GET" },
+    );
+
+    const res = await GET(req);
+
+    const text = await res.text();
+    if (res.status !== 429) {
+      console.log("rate-limit status:", res.status);
+      console.log("rate-limit body:", text);
+    }
+    const body = JSON.parse(text);
+
+    // --- Assert ---
+    expect(res.status).toBe(429);
+
+    const requestId = res.headers.get("x-request-id");
+    expect(requestId).toBeTruthy();
+
+    const retryAfter = res.headers.get("retry-after");
+    expect(retryAfter).toBeTruthy();
+    expect(Number(retryAfter)).toBeGreaterThan(0);
+
+    expect(body).toEqual({
+      ok: false,
+      error: {
+        code: "RATE_LIMIT",
+        message: "Too many attempts. Try again later.",
+        requestId: expect.any(String),
+      },
+    });
+  });
+
 });
