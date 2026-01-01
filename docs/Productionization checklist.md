@@ -249,10 +249,10 @@ Rule for each API route (to mark [x]):
     - [x] missing token → 400 BAD_REQUEST
     - [x] token length invalid → 404 NOT_FOUND
     - [x] rate-limit → 429 RATE_LIMIT
-  - [/] complete
+  - [x] complete
     - [x] happy path
     - [x] invalid/expired token
-    - [ ] already active / already completed path (if applicable)
+    - [x] already active / already completed path (if applicable)
 
 - [ ] Hours (pick minimum routes first)
   - [ ] employee: POST /api/employee/hours (create) happy path
