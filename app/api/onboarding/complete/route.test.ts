@@ -159,4 +159,50 @@ describe("POST /api/onboarding/complete", () => {
     expect(typeof json.error?.requestId).toBe("string");
     expect(json.error.requestId.length).toBeGreaterThan(0);
   });
+
+    it("already active -> 400 BAD_REQUEST (invite no longer valid) + requestId", async () => {
+    const company = await prisma.company.create({
+      data: { name: "TestCo" },
+      select: { id: true },
+    });
+
+    const token = "invite-token-already-active";
+    const inviteTokenHash = sha256Hex(token);
+
+    // Employee is already ACTIVE, but token hash still exists (simulates reuse)
+    await prisma.employee.create({
+      data: {
+        companyId: company.id,
+        name: "Already Active",
+        email: "active@test.no",
+        status: EmployeeStatus.ACTIVE,
+        inviteTokenHash,
+        inviteExpiresAt: new Date(Date.now() + 60_000),
+      },
+      select: { id: true },
+    });
+
+    const req = new Request("http://localhost/api/onboarding/complete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token,
+        name: "DoesntMatter",
+        password: "very-strong-password",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("x-request-id")).toBeTruthy();
+
+    const json = await res.json();
+    expect(json.ok).toBe(false);
+    expect(json.error?.code).toBe("BAD_REQUEST");
+    expect(json.error?.message).toBe("This invite is no longer valid");
+    expect(typeof json.error?.requestId).toBe("string");
+    expect(json.error.requestId.length).toBeGreaterThan(0);
+  });
+
 });
