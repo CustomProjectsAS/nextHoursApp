@@ -1,23 +1,39 @@
 import { prisma } from "@/lib/prisma";
-import { ok, fail } from "@/lib/api/response";
+import { okNext, failNext } from "@/lib/api/nextResponse";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const requestId = getOrCreateRequestId(req);
+
   const version = process.env.APP_VERSION ?? "unknown";
   const timestamp = new Date().toISOString();
 
   try {
     await prisma.$queryRaw`SELECT 1`;
 
-    return ok({
-      version,
-      db: { ok: true },
-      timestamp,
+    return okNext(
+      {
+        version,
+        db: { ok: true },
+        timestamp,
+      },
+      undefined,
+      requestId
+    );
+  } catch (err: any) {
+    log.error("INTERNAL: health GET", {
+      requestId,
+      errorName: err?.name,
+      errorMessage: err?.message,
     });
-  } catch {
-    return fail(
+
+    return failNext(
       "INTERNAL",
       "Service unavailable",
-      503
+      503,
+      undefined,
+      requestId
     );
   }
 }
