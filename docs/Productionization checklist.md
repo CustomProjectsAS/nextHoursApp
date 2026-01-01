@@ -242,13 +242,13 @@ Rule for each API route (to mark [x]):
   - [ ] signup not tested
 
 - [/] Onboarding
-  - [/] validate
+  - [x] validate
     - [x] happy path
     - [x] expired token → 400 BAD_REQUEST
     - [x] invalid token → 404 NOT_FOUND
     - [x] missing token → 400 BAD_REQUEST
     - [x] token length invalid → 404 NOT_FOUND
-    - [ ] rate-limit → 429 RATE_LIMIT
+    - [x] rate-limit → 429 RATE_LIMIT
   - [ ] complete
     - [ ] happy path
     - [ ] invalid/expired token
