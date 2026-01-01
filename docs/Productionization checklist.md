@@ -238,7 +238,7 @@ Rule for each API route (to mark [x]):
     - [x] choose-company happy path
     - [ ] signup not tested
     - [ ] rate-limit / edge failures not tested
-- [ ] Onboarding: validate + complete (happy + expired/invalid token)
+- [/] Onboarding: validate (happy + expired done; invalid token pending) + complete (pending)
 - [ ] Hours:
   - employee create/update
   - admin approve/reject/delete
