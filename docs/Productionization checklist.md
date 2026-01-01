@@ -245,7 +245,7 @@ Rule for each API route (to mark [x]):
   - [/] validate
     - [x] happy path
     - [x] expired token → 400 BAD_REQUEST
-    - [ ] invalid token → 404 NOT_FOUND
+    - [x] invalid token → 404 NOT_FOUND
     - [ ] missing token → 400 BAD_REQUEST
     - [ ] token length invalid → 404 NOT_FOUND
     - [ ] rate-limit → 429 RATE_LIMIT
