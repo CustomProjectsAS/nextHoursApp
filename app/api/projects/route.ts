@@ -2,12 +2,19 @@
 import { okNext, failNext } from "@/lib/api/nextResponse";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
+import { getOrCreateRequestId } from "@/lib/requestId";
+import { log } from "@/lib/log";
+
 
 export async function GET(req: Request) {
+  const requestId = getOrCreateRequestId(req);
+
   const ctx = await getAuthContext(req);
   if (!ctx) {
-    return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+    log.warn("AUTH_REQUIRED: projects GET", { requestId });
+    return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
   }
+
 
   try {
     const projects = await prisma.project.findMany({
@@ -23,17 +30,25 @@ export async function GET(req: Request) {
       },
     });
 
-        return okNext({ projects });
+    return okNext({ projects }, undefined, requestId);
 
-    } catch (error: any) {
-    console.error("GET /api/projects error:", error);
-    return failNext("INTERNAL", "Failed to load projects", 500);
+
+  } catch (error: any) {
+    log.error("INTERNAL: projects GET", {
+      requestId,
+      errorName: error?.name,
+      errorMessage: error?.message,
+    });
+    return failNext("INTERNAL", "Failed to load projects", 500, undefined, requestId);
   }
+
 
 }
 
 // Public creation is not allowed in SaaS (must be admin-scoped)
-export async function POST() {
-    return failNext("FORBIDDEN", "Forbidden", 403);
-
+export async function POST(req: Request) {
+  const requestId = getOrCreateRequestId(req);
+  log.warn("FORBIDDEN: projects POST (public disabled)", { requestId });
+  return failNext("FORBIDDEN", "Forbidden", 403, undefined, requestId);
 }
+
