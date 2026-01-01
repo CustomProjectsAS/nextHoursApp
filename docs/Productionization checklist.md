@@ -230,7 +230,14 @@ Rule for each API route (to mark [x]):
 
 ### 3.3 Critical route tests (minimal but real)
 - [x] Admin: GET /api/admin/dashboard returns 401 AUTH_REQUIRED + requestId
-- [/] Auth: signup/login/logout + choose-company (happy paths + 1 failure done; signup + remaining failures pending)
+- [/] Auth: login/logout/choose-company (happy paths + login failures done; signup pending)
+    - [x] login happy path
+    - [x] login wrong password
+    - [x] login unknown email
+    - [x] logout
+    - [x] choose-company happy path
+    - [ ] signup not tested
+    - [ ] rate-limit / edge failures not tested
 - [ ] Onboarding: validate + complete (happy + expired/invalid token)
 - [ ] Hours:
   - employee create/update
