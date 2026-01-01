@@ -121,16 +121,16 @@ A file can be checked ONLY when **all API calls inside it** comply.
 
 ## Gate 2 — Request ID + Structured Logging ✅ DONE
 
-### 2.0 Canonical rules (NEXT hardening targets — not required for Gate 2 DONE)
+### 2.0 Canonical rules (NEXT hardening targets — not required for Gate 2 DONE) ✅ DONE
 These are the rules we want **enforced everywhere**. Current checkboxes reflect **actual enforcement today**.
 
-Request ID:
+Request ID: ✅ DONE
 - [x] Library exists to read/generate request IDs
   - [x] Prefer incoming header: `x-request-id` / `x-correlation-id` / `x-amzn-trace-id`
   - [x] Else generate (crypto.randomUUID / randomUUID)
 - [x] Success body: DO NOT include requestId (keep Gate 1 contract clean)
 
-Logging:
+Logging: ✅ DONE
 - [x] Structured JSON logger exists (`lib/log.ts`)
 - [x] All API routes use structured logger (no `console.*`)
 - [x] Logger redacts sensitive keys by default (password/session/invite token etc.)
@@ -141,7 +141,7 @@ Logging:
   
 ---
 
-## 2.1 New library files ✅ DONE
+### 2.1 New library files ✅ DONE
 - [x] `lib/requestId.ts` exists
   - [x] `getOrCreateRequestId(req: Request): string`
 
@@ -154,7 +154,7 @@ Logging:
 
 ---
 
-## 2.2 Gate 1 helper extensions ✅ DONE
+### 2.2 Gate 1 helper extensions ✅ DONE
 - [x] `okNext` supports setting `x-request-id` when passed
 - [x] `failNext` includes requestId in:
   - [x] response header `x-request-id` (when passed)
@@ -162,7 +162,7 @@ Logging:
 
 ---
 
-## 2.3 Migrate API routes (inventory) ⏳ IN PROGRESS
+### 2.3 Migrate API routes (inventory) ✅ DONE
 
 Rule for each API route (to mark [x]):
 - Must create/propagate requestId at top
@@ -205,28 +205,61 @@ Rule for each API route (to mark [x]):
 
 ---
 
-## 2.4 Completion checks (must pass) ✅ DONE
+### 2.4 Completion checks (must pass) ✅ DONE
 - [x] Grep shows zero `console.` in `app/api/**`
 - [x] Every `app/api/**/route.ts` is wrapped with requestId pattern
 - [x] Every API error response contains `x-request-id` header + `error.requestId` body field
 
 ---
 
-## Gate 3 — Tests ⬜ NOT STARTED
-- [ ] Critical route tests exist (auth, onboarding, hours CRUD)
-- [ ] Contract tests for `{ ok, data } / { ok, error }`
-- [ ] Tenant isolation tests
-- [ ] Rate limit tests
-- [ ] Must be present for every API request (enforced across all routes)
-- [ ] Must be returned to client in:
-  - [ ] Response header: `x-request-id`
-  - [ ] Error body: `{ ok:false, error:{ code, message, requestId } }` (NOTE: requestId lives inside `error`)
-- [ ] Each emitted log line includes:
-  - [ ] `requestId` 
+## Gate 3 — Runtime proof + Tests ⏳ In progress
+
+### 3.1 Runtime RequestId proof (curl-level) ✅ Done
+- [x] Success responses include `x-request-id` header
+  - Proof command: `curl.exe -i http://localhost:3000/api/health`
+- [x] Error responses include `x-request-id` header
+  - Proof command: `curl.exe -i http://localhost:3000/api/admin/dashboard`
+- [x] Error body includes `error.requestId`
+  - Proof: response JSON contains `{ ok:false, error:{ requestId } }`
+
+### 3.2 Contract tests (API response shape) ✅ Done
+- [x] Unit tests cover `okNext` + `failNext` shape
+  - ok: `{ ok:true, data }`
+  - fail: `{ ok:false, error:{ code, message, requestId } }`
+- [x] At least 1 test asserts `x-request-id` header is set when requestId is provided
+
+### 3.3 Critical route tests (minimal but real)
+- [x] Admin: GET /api/admin/dashboard returns 401 AUTH_REQUIRED + requestId
+- [ ] Auth: signup/login/logout + choose-company (happy + 1 failure each)
+- [ ] Onboarding: validate + complete (happy + expired/invalid token)
+- [ ] Hours:
+  - employee create/update
+  - admin approve/reject/delete
+  - 1 validation failure path
+- [ ] Projects:
+  - admin create/update/disable
+- [ ] Employees:
+  - admin invite (and legacy endpoint returns 410)
+
+### 3.4 Tenant isolation tests (killer checks)
+- [ ] Cross-tenant access denied for:
+  - hours by id
+  - project by id
+  - employee by id
+- [ ] At least one test proves “same numeric id in another company” cannot be accessed
+
+### 3.5 Rate limit tests (only core)
+- [ ] `/api/auth/login` rate limits after threshold
+- [ ] `/api/auth/signup` rate limits after threshold
+- [ ] `/api/admin/invite` rate limits after threshold
+
+### 3.6 Logging schema (target — not enforced yet)
+- [ ] Standard log fields exist where emitted:
+  - [ ] `requestId`
   - [ ] `route`
-  - [ ] `companyId` (if available and non-sensitive)
+  - [ ] `companyId` (if available)
   - [ ] `statusCode` / `errorCode`
----
+
 
 ## Gate 4 — CI ⬜ NOT STARTED
 - [ ] Install
