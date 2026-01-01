@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
 import { okNext, failNext } from "@/lib/api/nextResponse";
-import { withRequestId } from "@/lib/api/withRequestId";
+import { getOrCreateRequestId } from "@/lib/requestId";
 import { log } from "@/lib/log";
 
 
@@ -32,21 +32,23 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
+    const requestId = getOrCreateRequestId(req);
+
     try {
         const ctx = await getAuthContext(req);
         if (!ctx) {
-            return failNext("AUTH_REQUIRED", "Unauthorized", 401);
+            log.warn("AUTH_REQUIRED: employee/hours/[id] PATCH", { requestId });
+            return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
         }
+
 
         const { id: idRaw } = await params;
 
         const id = Number(idRaw);
         if (!Number.isFinite(id) || id <= 0) {
-            return failNext("VALIDATION", "Invalid id", 400);
+            log.warn("VALIDATION: employee/hours/[id] PATCH (id)", { requestId, idRaw });
+            return failNext("VALIDATION", "Invalid id", 400, undefined, requestId);
         }
-
-
-
 
         const body = await req.json();
 
@@ -60,15 +62,17 @@ export async function PATCH(
         });
 
         if (!existing) {
-            return failNext("NOT_FOUND", "Not found", 404);
+            log.warn("NOT_FOUND: employee/hours/[id] PATCH (entry)", { requestId, id });
+            return failNext("NOT_FOUND", "Not found", 404, undefined, requestId);
         }
-
-
 
         // rule: cannot edit if APPROVED
-        if (existing.status === "APPROVED") {
-            return failNext("FORBIDDEN", "Entry is approved and cannot be edited.", 409);
-        }
+if (existing.status === "APPROVED") {
+    log.warn("FORBIDDEN: employee/hours/[id] PATCH (approved)", { requestId, id });
+    return failNext("FORBIDDEN", "Entry is approved and cannot be edited.", 409, undefined, requestId);
+}
+
+
 
 
         // editable fields (partial)
@@ -87,8 +91,8 @@ export async function PATCH(
             } else {
                 const n = Number(projectIdRaw);
                 if (!Number.isFinite(n) || n <= 0) {
-                    return failNext("VALIDATION", "Invalid projectId", 400);
-
+                    log.warn("VALIDATION: employee/hours/[id] PATCH (projectId)", { requestId });
+                    return failNext("VALIDATION", "Invalid projectId", 400, undefined, requestId);
                 }
                 // validate project belongs to company
                 const proj = await prisma.project.findFirst({
@@ -96,7 +100,8 @@ export async function PATCH(
                     select: { id: true },
                 });
                 if (!proj) {
-                    return failNext("NOT_FOUND", "Project not found", 404);
+                    log.warn("NOT_FOUND: employee/hours/[id] PATCH (project)", { requestId, projectId: projectIdRaw });
+                    return failNext("NOT_FOUND", "Project not found", 404, undefined, requestId);
                 }
 
                 nextProjectId = n;
@@ -108,7 +113,8 @@ export async function PATCH(
         if (dateRaw !== undefined) {
             const d = new Date(String(dateRaw));
             if (Number.isNaN(d.getTime())) {
-                return failNext("VALIDATION", "Invalid date", 400);
+                log.warn("VALIDATION: employee/hours/[id] PATCH (date)", { requestId });
+                return failNext("VALIDATION", "Invalid date", 400, undefined, requestId);
             }
 
             nextWorkDate = d;
@@ -122,8 +128,8 @@ export async function PATCH(
         const toMinutes = parseTimeToMinutes(nextToTime);
 
         if (fromMinutes === null || toMinutes === null) {
-            return failNext("VALIDATION", "Invalid time format. Use HH:MM.", 400);
-
+            log.warn("VALIDATION: employee/hours/[id] PATCH (time)", { requestId });
+            return failNext("VALIDATION", "Invalid time format. Use HH:MM.", 400, undefined, requestId);
         }
 
         // break minutes
@@ -135,8 +141,8 @@ export async function PATCH(
                     : parseInt(String(breakMinutesRaw || "0"), 10);
 
             if (Number.isNaN(bm) || bm < 0) {
-                return failNext("VALIDATION", "Break minutes must be a non-negative number.", 400);
-
+                log.warn("VALIDATION: employee/hours/[id] PATCH (breakMinutes)", { requestId });
+                return failNext("VALIDATION", "Break minutes must be a non-negative number.", 400, undefined, requestId);
             }
             nextBreakM = bm;
         }
@@ -144,15 +150,16 @@ export async function PATCH(
         const totalMinutes = computeTotalMinutes(fromMinutes, toMinutes);
 
         if (totalMinutes === 0) {
-            return failNext("VALIDATION", "End time must be different from start time.", 400);
-
+            log.warn("VALIDATION: employee/hours/[id] PATCH (zero duration)", { requestId });
+            return failNext("VALIDATION", "End time must be different from start time.", 400, undefined, requestId);
         }
 
         const netMinutes = totalMinutes - nextBreakM;
         if (netMinutes <= 0) {
-            return failNext("VALIDATION", "Break minutes must be a non-negative number.", 400);
+    log.warn("VALIDATION: employee/hours/[id] PATCH (netMinutes)", { requestId });
+    return failNext("VALIDATION", "Break minutes must be a non-negative number.", 400, undefined, requestId);
+}
 
-        }
 
         const nextHoursNet = netMinutes / 60;
 
@@ -178,9 +185,15 @@ export async function PATCH(
             },
         });
 
-        return okNext({ entry: updated });
-    } catch (err: any) {
-        console.error("PATCH /api/employee/hours/:id error:", err);
-        return failNext("INTERNAL", "Internal error", 500);
-    }
+        return okNext({ entry: updated }, undefined, requestId);
+
+   } catch (err: any) {
+    log.error("INTERNAL: employee/hours/[id] PATCH", {
+        requestId,
+        errorName: err?.name,
+        errorMessage: err?.message,
+    });
+    return failNext("INTERNAL", "Internal error", 500, undefined, requestId);
+}
+
 }
