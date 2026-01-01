@@ -191,4 +191,36 @@ describe("GET /api/onboarding/validate", () => {
       },
     });
   });
+
+    it("missing token → 400 BAD_REQUEST + requestId", async () => {
+    // --- Act ---
+    const req = new Request("http://test/api/onboarding/validate", {
+      method: "GET",
+    });
+
+    const res = await GET(req);
+
+    const text = await res.text();
+    if (res.status !== 400) {
+      console.log("missing token status:", res.status);
+      console.log("missing token body:", text);
+    }
+    const body = JSON.parse(text);
+
+    // --- Assert ---
+    expect(res.status).toBe(400);
+
+    const requestId = res.headers.get("x-request-id");
+    expect(requestId).toBeTruthy();
+
+    expect(body).toEqual({
+      ok: false,
+      error: {
+        code: "BAD_REQUEST",
+        message: "Missing token",
+        requestId: expect.any(String),
+      },
+    });
+  });
+
 });
