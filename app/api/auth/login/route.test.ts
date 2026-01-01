@@ -104,4 +104,63 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     });
 
   });
+    it("returns 401 INVALID_CREDENTIALS and does not set session cookie (wrong password)", async () => {
+    // --- Arrange (minimal fixture) ---
+    const correctPassword = "correct-password";
+    const wrongPassword = "wrong-password";
+    const passwordHash = await bcrypt.hash(correctPassword, 10);
+
+    const company = await prisma.company.create({
+      data: { name: "Test Company" },
+    });
+    createdCompanyId = company.id;
+
+    const user = await prisma.user.create({
+      data: {
+        email: "wrong-pass@test.com",
+        passwordHash,
+      },
+    });
+    createdUserId = user.id;
+
+    const employee = await prisma.employee.create({
+      data: {
+        userId: user.id,
+        companyId: company.id,
+        role: "EMPLOYEE",
+        status: "ACTIVE",
+        isActive: true,
+        name: "Test Employee",
+      },
+    });
+    createdEmployeeId = employee.id;
+
+    // --- Act ---
+    const res = await fetch("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: user.email,
+        password: wrongPassword,
+      }),
+    });
+
+    const text = await res.text();
+    const body = JSON.parse(text);
+
+    // --- Assert: HTTP + headers ---
+    expect(res.status).toBe(401);
+
+    const requestId = res.headers.get("x-request-id");
+    expect(requestId).toBeTruthy();
+
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie ?? "").not.toContain("cph_session=");
+
+    // --- Assert: body ---
+    expect(body.ok).toBe(false);
+    expect(body.error?.code).toBe("INVALID_CREDENTIALS");
+    expect(body.error?.requestId).toBe(requestId);
+  });
+
 });
