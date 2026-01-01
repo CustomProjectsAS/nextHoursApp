@@ -156,7 +156,7 @@ describe("GET /api/onboarding/validate", () => {
       },
     });
   });
-  
+
   it("invalid token (not in DB) → 404 NOT_FOUND + requestId", async () => {
     // --- Arrange ---
     const token = `missing-${crypto.randomUUID()}-${Date.now()}`; // length > 20, passes length guard
@@ -192,7 +192,7 @@ describe("GET /api/onboarding/validate", () => {
     });
   });
 
-    it("missing token → 400 BAD_REQUEST + requestId", async () => {
+  it("missing token → 400 BAD_REQUEST + requestId", async () => {
     // --- Act ---
     const req = new Request("http://test/api/onboarding/validate", {
       method: "GET",
@@ -223,4 +223,38 @@ describe("GET /api/onboarding/validate", () => {
     });
   });
 
+  it("token length invalid → 404 NOT_FOUND + requestId", async () => {
+    // --- Arrange ---
+    const token = "short-token"; // length < 20 triggers length guard
+
+    // --- Act ---
+    const req = new Request(
+      `http://test/api/onboarding/validate?token=${encodeURIComponent(token)}`,
+      { method: "GET" },
+    );
+
+    const res = await GET(req);
+
+    const text = await res.text();
+    if (res.status !== 404) {
+      console.log("length invalid status:", res.status);
+      console.log("length invalid body:", text);
+    }
+    const body = JSON.parse(text);
+
+    // --- Assert ---
+    expect(res.status).toBe(404);
+
+    const requestId = res.headers.get("x-request-id");
+    expect(requestId).toBeTruthy();
+
+    expect(body).toEqual({
+      ok: false,
+      error: {
+        code: "NOT_FOUND",
+        message: "Invalid invite link",
+        requestId: expect.any(String),
+      },
+    });
+  });
 });
