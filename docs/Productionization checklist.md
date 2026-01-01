@@ -258,6 +258,7 @@ Rule for each API route (to mark [x]):
 - [/] Hours (pick minimum routes first)
   - [x] employee: POST /api/employee/hours (create) happy path
   - [x] employee: PATCH /api/employee/hours/[id] (update) happy path
+  - [ ] employee: DELETE /api/employee/hours/[id] (delete) happy path (PENDING only)
   - [ ] admin: POST /api/admin/hours/[id]/approve happy path
   - [ ] admin: POST /api/admin/hours/[id]/reject happy path
   - [ ] admin: POST /api/admin/hours/[id]/delete happy path
