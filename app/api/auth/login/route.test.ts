@@ -72,8 +72,16 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
       }),
     });
 
+    const text = await res.text();
+    if (res.status !== 200) {
+      console.log("login status:", res.status);
+      console.log("login body:", text);
+    }
+    const body = JSON.parse(text);
+
     // --- Assert: HTTP + headers ---
     expect(res.status).toBe(200);
+
 
     const requestId = res.headers.get("x-request-id");
     expect(requestId).toBeTruthy();
@@ -82,8 +90,6 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     expect(setCookie).toContain("cph_session=");
 
     // --- Assert: body ---
-    const body = await res.json();
-
     expect(body).toEqual({
       ok: true,
       data: {

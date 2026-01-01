@@ -1,0 +1,108 @@
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { prisma } from "@/lib/prisma";
+import { createLoginChallenge } from "@/lib/auth";
+
+describe("POST /api/auth/login/choose-company — happy path", () => {
+    // scoped cleanup IDs to avoid cross-test nuking
+    let companyId: number | null = null;
+    let userId: number | null = null;
+    let employeeId: number | null = null;
+
+
+
+
+    afterEach(async () => {
+        if (employeeId) {
+            await prisma.session.deleteMany({ where: { employeeId } });
+            await prisma.hourEntry.deleteMany({ where: { employeeId } });
+            await prisma.employee.deleteMany({ where: { id: employeeId } });
+        }
+        if (userId) {
+            await prisma.user.deleteMany({ where: { id: userId } });
+        }
+        if (companyId) {
+            await prisma.company.deleteMany({ where: { id: companyId } });
+        }
+        companyId = null;
+        userId = null;
+        employeeId = null;
+    });
+
+    it("returns 200, sets session cookie, and returns user payload", async () => {
+        const prevSecret = process.env.AUTH_SECRET;
+        process.env.AUTH_SECRET =
+            "9f6c7c7a0bbd4f0f9e0f2d6a4c9b1f3a8d7c6b5a4e3d2c1b0a9f8e7d6c5b4a3";
+
+        // --- Arrange (minimal fixture) ---
+        const company = await prisma.company.create({
+            data: { name: "ChooseCo Test Co" },
+        });
+        companyId = company.id;
+
+        const user = await prisma.user.create({
+            data: {
+                email: `chooseco.test+${Date.now()}@test.com`,
+                passwordHash: "not-used-here",
+            },
+        });
+        userId = user.id;
+
+        const employee = await prisma.employee.create({
+            data: {
+                userId: user.id,
+                companyId: company.id,
+                role: "EMPLOYEE",
+                status: "ACTIVE",
+                isActive: true,
+                name: "ChooseCo Employee",
+            },
+        });
+        employeeId = employee.id;
+
+        const challengeToken = createLoginChallenge({
+            email: user.email,
+            employeeIds: [employee.id],
+            ttlMinutes: 5,
+        });
+
+        // --- Act ---
+        const res = await fetch("http://localhost:3000/api/auth/login/choose-company", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                challengeToken,
+                companyId: company.id,
+            }),
+        });
+        const text = await res.text();
+        if (res.status !== 200) {
+            console.log("choose-company status:", res.status);
+            console.log("choose-company body:", text);
+        }
+        const body = JSON.parse(text);
+
+
+        // --- Assert ---
+        expect(res.status).toBe(200);
+
+        const requestId = res.headers.get("x-request-id");
+        expect(requestId).toBeTruthy();
+
+        const setCookie = res.headers.get("set-cookie");
+        expect(setCookie).toContain("cph_session=");
+
+        expect(body).toEqual({
+            ok: true,
+            data: {
+                user: {
+                    employeeId: employee.id,
+                    companyId: company.id,
+                    role: "EMPLOYEE",
+                    name: "ChooseCo Employee",
+                    companyName: "ChooseCo Test Co",
+                },
+            },
+        });
+        process.env.AUTH_SECRET = prevSecret;
+    });
+});
