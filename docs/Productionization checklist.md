@@ -206,11 +206,11 @@ Rule for each API route (to mark [x]):
 
 ### Employee routes
 - [x] app/api/employee/hours/route.ts
-- [ ] app/api/employee/hours/[id]/route.ts (still uses `console.*`)
+- [x] app/api/employee/hours/[id]/route.ts
 
 ### Root routes
 - [ ] app/api/employees/route.ts
-- [ ] app/api/projects/route.ts
+- [x] app/api/projects/route.ts
 - [ ] app/api/health/route.ts
 
 ---
