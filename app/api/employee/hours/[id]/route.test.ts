@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { PATCH } from "./route";
+import { PATCH, DELETE } from "./route";
 import { createHash, randomBytes } from "crypto";
 
 const SESSION_COOKIE = "cph_session";
@@ -9,7 +9,8 @@ function sha256Hex(input: string) {
     return createHash("sha256").update(input).digest("hex");
 }
 
-describe("PATCH /api/employee/hours/[id] — happy path", () => {
+describe("/api/employee/hours/[id] — employee happy paths", () => {
+
     let companyId: number | null = null;
     let userId: number | null = null;
     let employeeId: number | null = null;
@@ -150,4 +151,85 @@ describe("PATCH /api/employee/hours/[id] — happy path", () => {
         expect(db.hoursBrut.toString()).toBe("7");
 
     });
+    it("deletes PENDING employee-owned entry (tenant-safe) -> { deleted: true } + requestId", async () => {
+        const company = await prisma.company.create({
+            data: { name: "Hours Delete Co" },
+        });
+        companyId = company.id;
+
+        const user = await prisma.user.create({
+            data: {
+                email: `hours.delete+${Date.now()}@test.com`,
+                passwordHash: "not-used",
+            },
+        });
+        userId = user.id;
+
+        const employee = await prisma.employee.create({
+            data: {
+                userId: user.id,
+                companyId: company.id,
+                role: "EMPLOYEE",
+                status: "ACTIVE",
+                isActive: true,
+                name: "Delete Employee",
+            },
+        });
+        employeeId = employee.id;
+
+        const token = randomBytes(32).toString("hex");
+        await prisma.session.create({
+            data: {
+                tokenHash: sha256Hex(token),
+                employeeId: employee.id,
+                companyId: company.id,
+                expiresAt: new Date(Date.now() + 60_000),
+            },
+        });
+
+        const existing = await prisma.hourEntry.create({
+            data: {
+                companyId: company.id,
+                employeeId: employee.id,
+                projectId: null,
+                workDate: new Date("2026-01-01"),
+                fromTime: "08:00",
+                toTime: "16:00",
+                breakMinutes: 30,
+                hoursNet: 7.5,
+                hoursBrut: 7.5,
+                description: "To delete",
+                status: "PENDING",
+            },
+        });
+        entryId = existing.id;
+
+        const req = new Request(`http://test/api/employee/hours/${existing.id}`, {
+            method: "DELETE",
+            headers: {
+                cookie: `${SESSION_COOKIE}=${token}`,
+            },
+        });
+
+        const res = await DELETE(req as any, {
+            params: Promise.resolve({ id: String(existing.id) }),
+        });
+
+        expect(res.status).toBe(200);
+
+        const requestId = res.headers.get("x-request-id");
+        expect(requestId).toBeTruthy();
+
+        const body = await res.json();
+        expect(body.ok).toBe(true);
+        expect(body.data?.deleted).toBe(true);
+
+        const db = await prisma.hourEntry.findUnique({ where: { id: existing.id } });
+        expect(db).toBeNull();
+
+        // prevent cleanup from trying to delete already-deleted row
+        entryId = null;
+    });
+
 });
+

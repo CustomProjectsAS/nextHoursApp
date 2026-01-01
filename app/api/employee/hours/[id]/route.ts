@@ -197,3 +197,75 @@ if (existing.status === "APPROVED") {
 }
 
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const requestId = getOrCreateRequestId(req);
+
+  try {
+    const ctx = await getAuthContext(req);
+    if (!ctx) {
+      log.warn("AUTH_REQUIRED: employee/hours/[id] DELETE", { requestId });
+      return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
+    }
+
+    const { id: idRaw } = await params;
+
+    const id = Number(idRaw);
+    if (!Number.isFinite(id) || id <= 0) {
+      log.warn("VALIDATION: employee/hours/[id] DELETE (id)", { requestId, idRaw });
+      return failNext("VALIDATION", "Invalid id", 400, undefined, requestId);
+    }
+
+    const existing = await prisma.hourEntry.findFirst({
+      where: {
+        id,
+        companyId: ctx.companyId,
+        employeeId: ctx.employeeId,
+      },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      log.warn("NOT_FOUND: employee/hours/[id] DELETE (entry)", { requestId, id });
+      return failNext("NOT_FOUND", "Not found", 404, undefined, requestId);
+    }
+
+    // rule: only PENDING can be deleted by employee
+    if (existing.status !== "PENDING") {
+      log.warn("FORBIDDEN: employee/hours/[id] DELETE (status)", {
+        requestId,
+        id,
+        status: existing.status,
+      });
+      return failNext(
+        "FORBIDDEN",
+        "Only pending entries can be deleted.",
+        409,
+        undefined,
+        requestId
+      );
+    }
+
+    await prisma.hourEntry.delete({ where: { id: existing.id } });
+
+    log.info("EMP_HOURS_DELETE_OK", {
+      requestId,
+      route: "DELETE /api/employee/hours/[id]",
+      companyId: ctx.companyId,
+      employeeId: ctx.employeeId,
+      entryId: existing.id,
+    });
+
+    return okNext({ deleted: true }, undefined, requestId);
+  } catch (err: any) {
+    log.error("INTERNAL: employee/hours/[id] DELETE", {
+      requestId,
+      errorName: err?.name,
+      errorMessage: err?.message,
+    });
+    return failNext("INTERNAL", "Internal error", 500, undefined, requestId);
+  }
+}
