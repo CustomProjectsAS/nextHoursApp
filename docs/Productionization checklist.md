@@ -230,23 +230,47 @@ Rule for each API route (to mark [x]):
 
 ### 3.3 Critical route tests (minimal but real)
 - [x] Admin: GET /api/admin/dashboard returns 401 AUTH_REQUIRED + requestId
-- [/] Auth: login/logout/choose-company (happy paths + login failures done; signup pending)
-    - [x] login happy path
-    - [x] login wrong password
-    - [x] login unknown email
-    - [x] logout
-    - [x] choose-company happy path
-    - [ ] signup not tested
+
+- [/] Auth
+  - [/] login
+    - [x] happy path
+    - [x] wrong password → 401 INVALID_CREDENTIALS, no session cookie
+    - [x] unknown email → 401 INVALID_CREDENTIALS, no session cookie
     - [ ] rate-limit / edge failures not tested
-- [/] Onboarding: validate (happy + expired done; invalid token pending) + complete (pending)
-- [ ] Hours:
-  - employee create/update
-  - admin approve/reject/delete
-  - 1 validation failure path
-- [ ] Projects:
-  - admin create/update/disable
-- [ ] Employees:
-  - admin invite (and legacy endpoint returns 410)
+  - [x] logout
+  - [x] choose-company happy path
+  - [ ] signup not tested
+
+- [/] Onboarding
+  - [/] validate
+    - [x] happy path
+    - [x] expired token → 400 BAD_REQUEST
+    - [ ] invalid token → 404 NOT_FOUND
+    - [ ] missing token → 400 BAD_REQUEST
+    - [ ] token length invalid → 404 NOT_FOUND
+    - [ ] rate-limit → 429 RATE_LIMIT
+  - [ ] complete
+    - [ ] happy path
+    - [ ] invalid/expired token
+    - [ ] already active / already completed path (if applicable)
+
+- [ ] Hours (pick minimum routes first)
+  - [ ] employee: POST /api/employee/hours (create) happy path
+  - [ ] employee: PATCH /api/employee/hours/[id] (update) happy path
+  - [ ] admin: POST /api/admin/hours/[id]/approve happy path
+  - [ ] admin: POST /api/admin/hours/[id]/reject happy path
+  - [ ] admin: POST /api/admin/hours/[id]/delete happy path
+  - [ ] one validation failure path (id invalid / forbidden / not found)
+
+- [ ] Projects
+  - [ ] admin: POST /api/admin/projects (create) happy path
+  - [ ] admin: PATCH /api/admin/projects/[id] (update) happy path
+  - [ ] admin: POST /api/admin/projects/[id]/disable happy path
+
+- [ ] Employees
+  - [ ] admin: POST /api/admin/invite happy path
+  - [ ] legacy endpoint returns 410
+
 
 ### 3.4 Tenant isolation tests (killer checks)
 - [ ] Cross-tenant access denied for:
