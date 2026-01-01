@@ -209,14 +209,14 @@ Rule for each API route (to mark [x]):
 - [x] app/api/employee/hours/[id]/route.ts
 
 ### Root routes
-- [ ] app/api/employees/route.ts
+- [x] app/api/employees/route.ts
 - [x] app/api/projects/route.ts
 - [ ] app/api/health/route.ts
 
 ---
 
 ## 2.4 Completion checks (must pass)
-- [ ] Grep shows zero `console.` in `app/api/**`
+- [x] Grep shows zero `console.` in `app/api/**`
 - [ ] Every `app/api/**/route.ts` is wrapped with requestId pattern
 - [ ] Every API error response contains `x-request-id` header + `error.requestId` body field
 
