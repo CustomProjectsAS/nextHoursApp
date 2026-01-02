@@ -297,8 +297,8 @@ Rules (every 3.4 test must assert ALL):
         - expect: 404 NOT_FOUND or 403 FORBIDDEN
         - prove: status remains PENDING + no activityEvent created
 
-- [ ] Cross-tenant ID access denied (READ/list route)
-  - [ ] admin: GET /api/admin/projects
+- [x] Cross-tenant ID access denied (READ/list route)
+  - [x] admin: GET /api/admin/projects
         - setup: create projects in Company A and Company B
         - action: Company A admin calls GET
         - expect: response contains only Company A project ids (explicitly assert foreign ids absent)
