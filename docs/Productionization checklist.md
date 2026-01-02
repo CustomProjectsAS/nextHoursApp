@@ -344,7 +344,7 @@ Global rules (apply to every 3.5 test):
   - [x] Assert no session created for the 429 attempt
   - [x] Assert no AuthEvent (or equivalent audit row) created for the 429 attempt (if route writes one)
 
-- [ ] `/api/auth/signup` rate limits after threshold
+- [x] `/api/auth/signup` rate limits after threshold
   - [x] Trigger 429 deterministically (unique limiter key for the test)
   - [x] Assert 429 + RATE_LIMIT + requestId + Retry-After (if present)
   - [x] Assert “429 attempt creates NO extra rows”:
@@ -353,7 +353,8 @@ Global rules (apply to every 3.5 test):
       - [x] company
       - [x] employee
       - [x] session (if applicable)
-  - [ ] Assert no “success” logs/audit rows are written for the 429 attempt (if route writes any)
+  - [x] Assert no “success” logs/audit rows are written for the 429 attempt (if route writes any)
+  - Justification: signup route does not write audit rows; SIGNUP_OK is only emitted after successful transaction
 
 - [ ] `/api/admin/invite` rate limits after threshold
   - [ ] Trigger 429 deterministically (unique limiter key for the test)
