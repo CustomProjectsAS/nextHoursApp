@@ -2,6 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { POST } from "./route";
+
 
 const SESSION_COOKIE = "cph_session";
 
@@ -58,12 +60,15 @@ describe("POST /api/auth/logout — happy path", () => {
     });
 
     // --- Act ---
-    const res = await fetch("http://localhost:3000/api/auth/logout", {
+    const req = new Request("http://localhost/api/auth/logout", {
       method: "POST",
       headers: {
         cookie: `${SESSION_COOKIE}=${token}`,
       },
     });
+
+    const res = await POST(req);
+
 
     // --- Assert: response ---
     expect(res.status).toBe(200);
@@ -73,10 +78,21 @@ describe("POST /api/auth/logout — happy path", () => {
 
     const setCookie = res.headers.get("set-cookie");
     expect(setCookie).toContain(`${SESSION_COOKIE}=`);
+    // session must be revoked (deleted) for this token
+    const stillThere = await prisma.session.findFirst({
+      where: { tokenHash },
+    });
+    expect(stillThere).toBeTruthy();
+    expect(stillThere?.revokedAt).toBeTruthy();
+
+
+    // cookie must be cleared (expires / max-age=0)
+    expect(setCookie).toMatch(/Max-Age=0|Expires=/);
+
 
     const body = await res.json();
     expect(body).toEqual({ ok: true, data: {} });
 
-   
+
   });
 });

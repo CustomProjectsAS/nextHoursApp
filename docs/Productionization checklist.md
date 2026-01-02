@@ -212,7 +212,7 @@ Rule for each API route (to mark [x]):
 
 ---
 
-## Gate 3 — Runtime proof + Tests ⏳ In progress 
+## Gate 3 — Runtime proof + Tests ⏳ In progress ✅ Done
 
 ### 3.1 Runtime RequestId proof (curl-level) ✅ Done
 - [x] Success responses include `x-request-id` header
@@ -363,7 +363,7 @@ Global rules (apply to every 3.5 test):
  
 
 
-### 3.6 Logging schema (enforced, not aspirational)
+### 3.6 Logging schema (enforced, not aspirational) ✅ Done
 Goal: logs are structured, consistent, and safe — not “whatever the dev felt like today”.
 
 Rules:
@@ -379,10 +379,10 @@ Required fields:
 - statusCode OR errorCode (at least one per request outcome)
 
 Enforcement (must be test-proven):
-- [ ] Unit test: logger output is JSON and includes required top-level keys (ts, level, message/msg, ctx)
-- [ ] Unit test: ctx includes requestId + route for at least one representative API log call
-- [ ] Unit test: redaction works (known sensitive keys are replaced/removed)
-- [ ] API-route test: at least one route emits a warn/error log with ctx containing:
+- [x] Unit test: logger output is JSON and includes required top-level keys (ts, level, message/msg, ctx)
+- [x] Unit test: ctx includes requestId + route for at least one representative API log call
+- [x] Unit test: redaction works (known sensitive keys are replaced/removed)
+- [x] API-route test: at least one route emits a warn/error log with ctx containing:
   - requestId
   - route
   - (companyId when authenticated)
@@ -393,14 +393,32 @@ Completion rule:
 
 
 ## Gate 4 — CI ⬜ NOT STARTED
-- [ ] Install
-- [ ] Lint
-- [ ] Typecheck
-- [ ] Test
-- [ ] Build
-- [ ] CI blocks main on failure
+Goal: CI is the enforcement mechanism. If CI is green, main is safe. If CI is red, main is blocked.
 
----
+### CI workflow requirements (test-proven by running in GitHub Actions)
+- [ ] GitHub Actions workflow exists at `.github/workflows/ci.yml`
+- [ ] Triggers: push to main + pull_request
+- [ ] Node pinned (e.g. 20.x)
+- [ ] Install uses `npm ci` (lockfile is authoritative)
+- [ ] Cache npm for speed (optional but recommended)
+
+### Database requirements (non-negotiable)
+- [ ] CI uses a local Postgres service container (NOT Render / remote)
+- [ ] `DATABASE_URL` points to CI Postgres with `sslmode=disable`
+- [ ] Prisma is prepared before tests:
+  - [ ] `npx prisma generate`
+  - [ ] `npx prisma migrate deploy` (or `db push` if explicitly chosen)
+
+### Required checks (must all pass)
+- [ ] Typecheck: `npm run typecheck`
+- [ ] Tests (local DB): `npm run test:local`
+- [ ] Build: `npm run build`
+- [ ] Lint: `npm run lint` (only if lint is actually enforced)
+
+### Branch protection (blocks main)
+- [ ] Require CI checks to pass before merging
+- [ ] Disallow merge when checks fail
+
 
 ## Gate 5 — Minimum Safety ⬜ NOT STARTED
 - [ ] Startup env validation
@@ -413,6 +431,6 @@ Completion rule:
 ## CURRENT POSITION
 - Gate 1: ✅ DONE
 - Gate 2: ✅ DONE
-- Gate 3: ⏳ IN PROGRESS
-- Gate 4: ⬜
+- Gate 3: ✅ DONE
+- Gate 4: ⏳ IN PROGRESS
 - Gate 5: ⬜

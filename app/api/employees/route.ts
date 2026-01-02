@@ -7,12 +7,20 @@ import { log } from "@/lib/log";
 
 export async function GET(req: Request) {
   const requestId = getOrCreateRequestId(req);
+  const route = "GET /api/employees";
+
 
   try {
     const ctx = await getAuthContext(req);
 
     if (!ctx) {
-      log.warn("AUTH_REQUIRED: employees GET", { requestId });
+      log.warn("AUTH_REQUIRED: employees GET", {
+        requestId,
+        route,
+        statusCode: 401,
+        errorCode: "AUTH_REQUIRED",
+      });
+
       return failNext("AUTH_REQUIRED", "Unauthorized", 401, undefined, requestId);
 
     }
@@ -28,12 +36,16 @@ export async function GET(req: Request) {
 
     return okNext({ employees }, undefined, requestId);
 
-    } catch (error: any) {
+  } catch (error: any) {
     log.error("INTERNAL: employees GET", {
       requestId,
+      route,
+      statusCode: 500,
+      errorCode: "INTERNAL",
       errorName: error?.name,
       errorMessage: error?.message,
     });
+
     return failNext("INTERNAL", "Failed to load employees", 500, undefined, requestId);
   }
 }

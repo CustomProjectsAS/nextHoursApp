@@ -5,6 +5,8 @@ import { log } from "@/lib/log";
 
 export async function GET(req: Request) {
   const requestId = getOrCreateRequestId(req);
+  const route = "GET /api/health";
+
 
   const version = process.env.APP_VERSION ?? "unknown";
   const timestamp = new Date().toISOString();
@@ -24,9 +26,13 @@ export async function GET(req: Request) {
   } catch (err: any) {
     log.error("INTERNAL: health GET", {
       requestId,
+      route,
+      statusCode: 503,
+      errorCode: "INTERNAL",
       errorName: err?.name,
       errorMessage: err?.message,
     });
+
 
     return failNext(
       "INTERNAL",
