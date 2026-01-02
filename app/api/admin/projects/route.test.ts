@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import { createHash, randomBytes } from "crypto";
 import { PATCH } from "./[id]/route";
-
+import { POST as DISABLE } from "./[id]/disable/route";
 
 const SESSION_COOKIE = "cph_session";
 
@@ -226,5 +226,93 @@ describe("/api/admin/projects — create happy path", () => {
         expect(ev!.actorType).toBe("EMPLOYEE"); // assert current behavior
         expect(ev!.actorId).toBe(adminEmployee.id);
     });
+    it("ADMIN can disable project -> ok + requestId + DB mutation + activityEvent", async () => {
+        const company = await prisma.company.create({
+            data: { name: "Projects Disable Co" },
+        });
+        companyId = company.id;
 
+        const adminUser = await prisma.user.create({
+            data: {
+                email: `admin.projects.disable+${Date.now()}@test.com`,
+                passwordHash: "not-used",
+            },
+        });
+        adminUserId = adminUser.id;
+
+        const adminEmployee = await prisma.employee.create({
+            data: {
+                userId: adminUser.id,
+                companyId: company.id,
+                role: "ADMIN",
+                status: "ACTIVE",
+                isActive: true,
+                name: "Admin Project Disabler",
+            },
+        });
+        adminEmployeeId = adminEmployee.id;
+
+        const token = randomBytes(32).toString("hex");
+        await prisma.session.create({
+            data: {
+                tokenHash: sha256Hex(token),
+                employeeId: adminEmployee.id,
+                companyId: company.id,
+                expiresAt: new Date(Date.now() + 60_000),
+            },
+        });
+
+        // create active project to disable
+        const created = await prisma.project.create({
+            data: {
+                companyId: company.id,
+                name: "Gamma Project",
+                color: "#333333",
+                isActive: true,
+            },
+            select: { id: true },
+        });
+        projectId = created.id;
+
+        const req = new Request(`http://test/api/admin/projects/${created.id}/disable`, {
+            method: "POST",
+            headers: {
+                cookie: `${SESSION_COOKIE}=${token}`,
+            },
+        });
+
+        const res = await DISABLE(req as any, {
+            params: Promise.resolve({ id: String(created.id) }),
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("x-request-id")).toBeTruthy();
+
+        const body = await res.json();
+        expect(body.ok).toBe(true);
+        expect(body.data?.project).toBeTruthy();
+
+        const project = body.data.project;
+        expect(project.id).toBe(created.id);
+        expect(project.name).toBe("Gamma Project");
+        expect(project.isActive).toBe(false);
+
+        const db = await prisma.project.findUnique({ where: { id: created.id } });
+        if (!db) throw new Error("Expected project to exist in DB");
+        expect(db.companyId).toBe(company.id);
+        expect(db.isActive).toBe(false);
+
+        const ev = await prisma.activityEvent.findFirst({
+            where: {
+                companyId: company.id,
+                entityType: "PROJECT",
+                entityId: created.id,
+                eventType: "PROJECT_DISABLED",
+            },
+        });
+
+        expect(ev).toBeTruthy();
+        expect(ev!.actorType).toBe("EMPLOYEE"); // assert current behavior
+        expect(ev!.actorId).toBe(adminEmployee.id);
+    });
 });
