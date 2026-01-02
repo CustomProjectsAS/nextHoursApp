@@ -5,11 +5,11 @@ type LogContext = Record<string, unknown>;
 
 const REDACT_KEYS = [
   "password",
-  "passwordHash",
+  "passwordhash",
   "token",
   "session",
-  "sessionToken",
-  "inviteToken",
+  "sessiontoken",
+  "invitetoken",
   "authorization",
   "cookie",
   "set-cookie",
@@ -43,13 +43,15 @@ function emit(level: LogLevel, message: string, ctx?: LogContext) {
     ts: new Date().toISOString(),
     level,
     message,
-    ...(ctx ? { ctx: redact(ctx) } : {}),
+    // ctx must always exist to be "predictable schema"
+    ctx: ctx ? (redact(ctx) as Record<string, unknown>) : {},
   };
 
   // One JSON per line. Plays nicely with Render, CloudWatch, ELK, etc.
   // eslint-disable-next-line no-console
   console[level === "debug" ? "log" : level](JSON.stringify(record));
 }
+
 
 export const log = {
   debug: (message: string, ctx?: LogContext) => emit("debug", message, ctx),
