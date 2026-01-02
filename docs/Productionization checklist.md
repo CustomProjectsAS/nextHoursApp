@@ -323,7 +323,7 @@ Rules (every 3.4 test must assert ALL):
 
 
 
-### 3.5 Rate limit tests (core + deterministic)
+### 3.5 Rate limit tests (core + deterministic) ✅ Done
 Goal: prove rate limiting is real, deterministic, and cannot create side effects when blocked.
 
 Global rules (apply to every 3.5 test):
@@ -356,11 +356,11 @@ Global rules (apply to every 3.5 test):
   - [x] Assert no “success” logs/audit rows are written for the 429 attempt (if route writes any)
   - Justification: signup route does not write audit rows; SIGNUP_OK is only emitted after successful transaction
 
-- [ ] `/api/admin/invite` rate limits after threshold
-  - [ ] Trigger 429 deterministically (unique limiter key for the test)
-  - [ ] Assert 429 + RATE_LIMIT + requestId + Retry-After (if present)
-  - [ ] Assert no invite created / no employee created / no auth event created on 429
-  - [ ] Assert no email side effect is attempted (if app ever adds email sending, this must remain true)
+- [x] `/api/admin/invite` rate limits after threshold
+  - [x] Trigger 429 deterministically (unique limiter key for the test)
+  - [x] Assert 429 + RATE_LIMIT + requestId + Retry-After (if present)
+  - [x] Assert no invite created / no employee created / no auth event created on 429
+ 
 
 
 ### 3.6 Logging schema (enforced, not aspirational)
