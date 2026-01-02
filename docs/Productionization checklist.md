@@ -228,7 +228,7 @@ Rule for each API route (to mark [x]):
   - fail: `{ ok:false, error:{ code, message, requestId } }`
 - [x] At least 1 test asserts `x-request-id` header is set when requestId is provided
 
-### 3.3 Critical route tests (minimal but real)
+### 3.3 Critical route tests (minimal but real) ✅ Done
 - [x] Admin: GET /api/admin/dashboard returns 401 AUTH_REQUIRED + requestId
 
 - [x] Auth
@@ -269,9 +269,9 @@ Rule for each API route (to mark [x]):
   - [x] admin: PATCH /api/admin/projects/[id] (update) happy path
   - [x] admin: POST /api/admin/projects/[id]/disable happy path
 
-- [/] Employees
+- [x] Employees
   - [x] admin: POST /api/admin/invite happy path
-  - [ ] legacy endpoint returns 410
+  - [x] legacy endpoint returns 410
 
 
 ### 3.4 Tenant isolation tests (killer checks)
