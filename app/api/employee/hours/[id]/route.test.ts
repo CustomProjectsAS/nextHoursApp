@@ -379,6 +379,151 @@ describe("/api/employee/hours/[id] — employee happy paths", () => {
         });
         expect(auditAfter).toBe(auditBefore);
     });
+    it("numeric ID collision safety: Company B cannot PATCH Company A entry even when both tenants have hour entries", async () => {
+        // Company A
+        const companyA = await prisma.company.create({ data: { name: "Collision A Co" } });
+        companyId = companyA.id;
+
+        const userA = await prisma.user.create({
+            data: {
+                email: `collisionA+${Date.now()}@test.com`,
+                passwordHash: "not-used",
+            },
+        });
+        userId = userA.id;
+
+        const empA = await prisma.employee.create({
+            data: {
+                userId: userA.id,
+                companyId: companyA.id,
+                role: "EMPLOYEE",
+                status: "ACTIVE",
+                isActive: true,
+                name: "Collision A Employee",
+            },
+        });
+        employeeId = empA.id;
+
+        const entryA = await prisma.hourEntry.create({
+            data: {
+                companyId: companyA.id,
+                employeeId: empA.id,
+                projectId: null,
+                workDate: new Date("2026-01-02"),
+                fromTime: "08:00",
+                toTime: "16:00",
+                breakMinutes: 30,
+                hoursNet: 7.5,
+                hoursBrut: 7.5,
+                description: "A entry",
+                status: "PENDING",
+            },
+        });
+
+        // Company B
+        const companyB = await prisma.company.create({ data: { name: "Collision B Co" } });
+        companyIdB = companyB.id;
+
+        const userB = await prisma.user.create({
+            data: {
+                email: `collisionB+${Date.now()}@test.com`,
+                passwordHash: "not-used",
+            },
+        });
+        userIdB = userB.id;
+
+        const empB = await prisma.employee.create({
+            data: {
+                userId: userB.id,
+                companyId: companyB.id,
+                role: "EMPLOYEE",
+                status: "ACTIVE",
+                isActive: true,
+                name: "Collision B Employee",
+            },
+        });
+        employeeIdB = empB.id;
+
+        const tokenB = randomBytes(32).toString("hex");
+        await prisma.session.create({
+            data: {
+                tokenHash: sha256Hex(tokenB),
+                employeeId: empB.id,
+                companyId: companyB.id,
+                expiresAt: new Date(Date.now() + 60_000),
+            },
+        });
+
+        const entryB = await prisma.hourEntry.create({
+            data: {
+                companyId: companyB.id,
+                employeeId: empB.id,
+                projectId: null,
+                workDate: new Date("2026-01-02"),
+                fromTime: "09:00",
+                toTime: "17:00",
+                breakMinutes: 30,
+                hoursNet: 7.5,
+                hoursBrut: 7.5,
+                description: "B entry",
+                status: "PENDING",
+            },
+        });
+
+        // Snapshot A
+        const beforeA = await prisma.hourEntry.findUnique({ where: { id: entryA.id } });
+        if (!beforeA) throw new Error("Expected Company A entry to exist");
+
+        const auditBefore = await prisma.activityEvent.count({
+            where: {
+                companyId: companyA.id,
+                entityType: "HOUR_ENTRY",
+                entityId: entryA.id,
+            },
+        });
+
+        // Attack: B tries to patch A using numeric ID
+        const req = new Request(`http://test/api/employee/hours/${entryA.id}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                cookie: `${SESSION_COOKIE}=${tokenB}`,
+            },
+            body: JSON.stringify({ description: "collision attack" }),
+        });
+
+        const res = await PATCH(req as any, {
+            params: Promise.resolve({ id: String(entryA.id) }),
+        });
+
+        expect([403, 404]).toContain(res.status);
+
+        const requestId = res.headers.get("x-request-id");
+        expect(requestId).toBeTruthy();
+
+        const body = await res.json();
+        expect(body.ok).toBe(false);
+        expect(body.error?.requestId).toBe(requestId);
+
+        // A untouched
+        const afterA = await prisma.hourEntry.findUnique({ where: { id: entryA.id } });
+        if (!afterA) throw new Error("Expected Company A entry to still exist");
+
+        expect(afterA.description).toBe(beforeA.description);
+        expect(afterA.companyId).toBe(companyA.id);
+        expect(afterA.employeeId).toBe(empA.id);
+
+        // No audit
+        const auditAfter = await prisma.activityEvent.count({
+            where: {
+                companyId: companyA.id,
+                entityType: "HOUR_ENTRY",
+                entityId: entryA.id,
+            },
+        });
+
+        expect(auditAfter).toBe(auditBefore);
+    });
 
 });
 
