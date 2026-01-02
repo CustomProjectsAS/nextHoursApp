@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
+import { env } from "@/lib/env";
 
 const { Pool } = pkg;
 
@@ -8,12 +9,12 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-const isProd = process.env.NODE_ENV === "production";
+const isProd = env.NODE_ENV === "production";
 
 // Safer default: in production, require TLS with normal certificate verification.
 // In dev/test, default to no SSL (local Postgres), unless DATABASE_URL demands otherwise.
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: env.DATABASE_URL,
   ssl: isProd ? true : undefined,
 });
 
@@ -27,6 +28,7 @@ export const prisma =
     log: ["error", "warn"],
   });
 
-if (process.env.NODE_ENV !== "production") {
+if (env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
+
