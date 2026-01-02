@@ -255,14 +255,14 @@ Rule for each API route (to mark [x]):
     - [x] invalid/expired token
     - [x] already active / already completed path (if applicable)
 
-- [/] Hours (pick minimum routes first)
+- [x] Hours (pick minimum routes first)
   - [x] employee: POST /api/employee/hours (create) happy path
   - [x] employee: PATCH /api/employee/hours/[id] (update) happy path
   - [x] employee: DELETE /api/employee/hours/[id] (delete) happy path (PENDING only)
   - [x] admin: POST /api/admin/hours/[id]/approve happy path
   - [x] admin: POST /api/admin/hours/[id]/reject happy path
   - [x] admin: POST /api/admin/hours/[id]/delete happy path
-  - [ ] one validation failure path (id invalid / forbidden / not found)
+  - [x] one validation failure path (id invalid / forbidden / not found) only forbidden
 
 - [ ] Projects
   - [ ] admin: POST /api/admin/projects (create) happy path
