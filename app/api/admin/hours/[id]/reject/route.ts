@@ -52,37 +52,58 @@ export async function POST(
             return okNext({ alreadyRejected: true }, undefined, requestId);
         }
 
-        const updated = await prisma.hourEntry.update({
-            where: { id },
-            data: {
-                status: "REJECTED",
-                rejectReason: rejectReasonRaw,
-            },
-        });
-
-        await prisma.activityEvent.create({
-            data: {
-                companyId: ctx.companyId,
-                actorType: ctx.role,
-                actorId: ctx.employeeId,
-                actorName: ctx.name ?? null,
-                entityType: "HOUR_ENTRY",
-                entityId: updated.id,
-                eventType: "HOUR_REJECTED",
-                summary: `Rejected hour entry #${updated.id}`,
-                meta: {
-                    prevStatus: existing.status,
-                    nextStatus: "REJECTED",
+        const updated = await prisma.$transaction(async (tx) => {
+            const result = await tx.hourEntry.updateMany({
+                where: {
+                    id,
+                    companyId: ctx.companyId,
+                    deletedAt: null,
+                },
+                data: {
+                    status: "REJECTED",
                     rejectReason: rejectReasonRaw,
                 },
-            },
-        });
+            });
 
+            if (result.count !== 1) {
+                // row disappeared or tenant mismatch after the earlier read (race)
+                throw Object.assign(new Error("Hour entry not found"), { code: "NOT_FOUND" });
+            }
+
+            const row = await tx.hourEntry.findUnique({ where: { id } });
+            if (!row) {
+                throw Object.assign(new Error("Hour entry not found"), { code: "NOT_FOUND" });
+            }
+
+            await tx.activityEvent.create({
+                data: {
+                    companyId: ctx.companyId,
+                    actorType: ctx.role,
+                    actorId: ctx.employeeId,
+                    actorName: ctx.name ?? null,
+                    entityType: "HOUR_ENTRY",
+                    entityId: id,
+                    eventType: "HOUR_REJECTED",
+                    summary: `Rejected hour entry #${id}`,
+                    meta: {
+                        prevStatus: existing.status,
+                        nextStatus: "REJECTED",
+                        rejectReason: rejectReasonRaw,
+                    },
+                },
+            });
+
+            return row;
+        });
 
         return okNext({ entry: updated }, undefined, requestId);
 
 
     } catch (err: any) {
+        if (err?.code === "NOT_FOUND") {
+            return failNext("NOT_FOUND", "Hour entry not found", 404, undefined, requestId);
+        }
+
         log.error("INTERNAL: admin/hours/[id]/reject POST", {
             requestId,
             errorName: err?.name,

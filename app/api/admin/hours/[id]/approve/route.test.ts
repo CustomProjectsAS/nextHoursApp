@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import { createHash, randomBytes } from "crypto";
@@ -10,59 +10,52 @@ function sha256Hex(input: string) {
 }
 
 describe("/api/admin/hours/[id]/approve — admin happy path", () => {
+
+
+
     let companyId: number | null = null;
     let adminUserId: number | null = null;
     let adminEmployeeId: number | null = null;
+    let entryId: number | null = null;
     let workerUserId: number | null = null;
     let workerEmployeeId: number | null = null;
-    let entryId: number | null = null;
 
     // Company B (attacker admin)
     let companyIdB: number | null = null;
     let adminUserIdB: number | null = null;
     let adminEmployeeIdB: number | null = null;
 
-
     afterEach(async () => {
-        if (entryId) {
-            await prisma.activityEvent
-                .deleteMany({ where: { entityId: entryId } })
-                .catch(() => { });
-            await prisma.hourEntry
-                .deleteMany({ where: { id: entryId } })
-                .catch(() => { });
-        }
-
-        if (adminEmployeeId) {
-            await prisma.session.deleteMany({ where: { employeeId: adminEmployeeId } });
-            await prisma.employee.deleteMany({ where: { id: adminEmployeeId } });
-        }
-        if (workerEmployeeId) {
-            await prisma.session.deleteMany({ where: { employeeId: workerEmployeeId } });
-            await prisma.hourEntry.deleteMany({ where: { employeeId: workerEmployeeId } });
-            await prisma.employee.deleteMany({ where: { id: workerEmployeeId } });
-        }
-        if (adminUserId) {
-            await prisma.user.deleteMany({ where: { id: adminUserId } });
-        }
-        if (workerUserId) {
-            await prisma.user.deleteMany({ where: { id: workerUserId } });
-        }
+        // 1) Delete audit + hour entries first (they hold FKs to company/employee)
         if (companyId) {
-            await prisma.company.deleteMany({ where: { id: companyId } });
-        }
-        if (adminEmployeeIdB) {
-            await prisma.session.deleteMany({ where: { employeeId: adminEmployeeIdB } });
-            await prisma.employee.deleteMany({ where: { id: adminEmployeeIdB } });
-        }
-        if (adminUserIdB) {
-            await prisma.user.deleteMany({ where: { id: adminUserIdB } });
+            await prisma.activityEvent.deleteMany({ where: { companyId } }).catch(() => { });
+            await prisma.hourEntry.deleteMany({ where: { companyId } }).catch(() => { });
         }
         if (companyIdB) {
-            await prisma.company.deleteMany({ where: { id: companyIdB } });
+            await prisma.activityEvent.deleteMany({ where: { companyId: companyIdB } }).catch(() => { });
+            await prisma.hourEntry.deleteMany({ where: { companyId: companyIdB } }).catch(() => { });
         }
 
+        // 2) Sessions
+        if (adminEmployeeId) await prisma.session.deleteMany({ where: { employeeId: adminEmployeeId } }).catch(() => { });
+        if (workerEmployeeId) await prisma.session.deleteMany({ where: { employeeId: workerEmployeeId } }).catch(() => { });
+        if (adminEmployeeIdB) await prisma.session.deleteMany({ where: { employeeId: adminEmployeeIdB } }).catch(() => { });
 
+        // 3) Employees
+        if (adminEmployeeId) await prisma.employee.deleteMany({ where: { id: adminEmployeeId } }).catch(() => { });
+        if (workerEmployeeId) await prisma.employee.deleteMany({ where: { id: workerEmployeeId } }).catch(() => { });
+        if (adminEmployeeIdB) await prisma.employee.deleteMany({ where: { id: adminEmployeeIdB } }).catch(() => { });
+
+        // 4) Users
+        if (adminUserId) await prisma.user.deleteMany({ where: { id: adminUserId } }).catch(() => { });
+        if (workerUserId) await prisma.user.deleteMany({ where: { id: workerUserId } }).catch(() => { });
+        if (adminUserIdB) await prisma.user.deleteMany({ where: { id: adminUserIdB } }).catch(() => { });
+
+        // 5) Companies last
+        if (companyId) await prisma.company.deleteMany({ where: { id: companyId } }).catch(() => { });
+        if (companyIdB) await prisma.company.deleteMany({ where: { id: companyIdB } }).catch(() => { });
+
+        // reset
         companyId = null;
         adminUserId = null;
         adminEmployeeId = null;
@@ -72,8 +65,8 @@ describe("/api/admin/hours/[id]/approve — admin happy path", () => {
         companyIdB = null;
         adminUserIdB = null;
         adminEmployeeIdB = null;
-
     });
+
 
     it("approves a PENDING entry in same company (admin-only) -> status APPROVED + requestId + activityEvent", async () => {
         const company = await prisma.company.create({
@@ -112,31 +105,12 @@ describe("/api/admin/hours/[id]/approve — admin happy path", () => {
             },
         });
 
-        // worker identity (owns the hour entry)
-        const workerUser = await prisma.user.create({
-            data: {
-                email: `worker.approve+${Date.now()}@test.com`,
-                passwordHash: "not-used",
-            },
-        });
-        workerUserId = workerUser.id;
 
-        const workerEmployee = await prisma.employee.create({
-            data: {
-                userId: workerUser.id,
-                companyId: company.id,
-                role: "EMPLOYEE",
-                status: "ACTIVE",
-                isActive: true,
-                name: "Worker",
-            },
-        });
-        workerEmployeeId = workerEmployee.id;
 
         const existing = await prisma.hourEntry.create({
             data: {
                 companyId: company.id,
-                employeeId: workerEmployee.id,
+                employeeId: adminEmployee.id,
                 projectId: null,
                 workDate: new Date("2026-01-01"),
                 fromTime: "08:00",

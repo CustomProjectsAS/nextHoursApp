@@ -35,12 +35,14 @@ export async function getAuthContext(req: Request): Promise<AuthContext | null> 
   if (!session) return null;
 
   // best-effort
+  // best-effort: never throw if session disappears (race with cleanup)
   prisma.session
-    .update({
+    .updateMany({
       where: { id: session.id },
       data: { lastUsedAt: new Date() },
     })
-    .catch(() => {});
+    .catch(() => { });
+
 
   return {
     employeeId: session.employeeId,

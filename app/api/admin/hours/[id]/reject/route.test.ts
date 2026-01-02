@@ -11,41 +11,30 @@ function sha256Hex(input: string) {
 
 describe("/api/admin/hours/[id]/reject — admin happy path", () => {
   let companyId: number | null = null;
-
   let adminUserId: number | null = null;
   let adminEmployeeId: number | null = null;
-
-  let workerUserId: number | null = null;
-  let workerEmployeeId: number | null = null;
-
   let entryId: number | null = null;
 
   afterEach(async () => {
     if (entryId) {
       await prisma.activityEvent
         .deleteMany({ where: { entityId: entryId } })
-        .catch(() => {});
+        .catch(() => { });
       await prisma.hourEntry
         .deleteMany({ where: { id: entryId } })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     if (adminEmployeeId) {
       await prisma.session.deleteMany({ where: { employeeId: adminEmployeeId } });
       await prisma.employee.deleteMany({ where: { id: adminEmployeeId } });
     }
-    if (workerEmployeeId) {
-      await prisma.session.deleteMany({ where: { employeeId: workerEmployeeId } });
-      await prisma.hourEntry.deleteMany({ where: { employeeId: workerEmployeeId } });
-      await prisma.employee.deleteMany({ where: { id: workerEmployeeId } });
-    }
+
 
     if (adminUserId) {
       await prisma.user.deleteMany({ where: { id: adminUserId } });
     }
-    if (workerUserId) {
-      await prisma.user.deleteMany({ where: { id: workerUserId } });
-    }
+
 
     if (companyId) {
       await prisma.company.deleteMany({ where: { id: companyId } });
@@ -54,8 +43,6 @@ describe("/api/admin/hours/[id]/reject — admin happy path", () => {
     companyId = null;
     adminUserId = null;
     adminEmployeeId = null;
-    workerUserId = null;
-    workerEmployeeId = null;
     entryId = null;
   });
 
@@ -96,31 +83,10 @@ describe("/api/admin/hours/[id]/reject — admin happy path", () => {
       },
     });
 
-    // worker identity (owns the hour entry)
-    const workerUser = await prisma.user.create({
-      data: {
-        email: `worker.reject+${Date.now()}@test.com`,
-        passwordHash: "not-used",
-      },
-    });
-    workerUserId = workerUser.id;
-
-    const workerEmployee = await prisma.employee.create({
-      data: {
-        userId: workerUser.id,
-        companyId: company.id,
-        role: "EMPLOYEE",
-        status: "ACTIVE",
-        isActive: true,
-        name: "Worker",
-      },
-    });
-    workerEmployeeId = workerEmployee.id;
-
     const existing = await prisma.hourEntry.create({
       data: {
         companyId: company.id,
-        employeeId: workerEmployee.id,
+        employeeId: adminEmployee.id,
         projectId: null,
         workDate: new Date("2026-01-01"),
         fromTime: "08:00",

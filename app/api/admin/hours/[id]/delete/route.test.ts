@@ -13,28 +13,24 @@ describe("/api/admin/hours/[id]/delete — admin happy path", () => {
   let companyId: number | null = null;
   let adminUserId: number | null = null;
   let adminEmployeeId: number | null = null;
-  let workerUserId: number | null = null;
-  let workerEmployeeId: number | null = null;
   let entryId: number | null = null;
 
   afterEach(async () => {
     if (entryId) {
-      await prisma.activityEvent.deleteMany({ where: { entityId: entryId } }).catch(() => {});
-      await prisma.hourEntry.deleteMany({ where: { id: entryId } }).catch(() => {});
+      await prisma.activityEvent.deleteMany({ where: { entityId: entryId } }).catch(() => { });
+      await prisma.hourEntry.deleteMany({ where: { id: entryId } }).catch(() => { });
     }
     if (adminEmployeeId) {
       await prisma.session.deleteMany({ where: { employeeId: adminEmployeeId } });
       await prisma.employee.deleteMany({ where: { id: adminEmployeeId } });
     }
-    if (workerEmployeeId) {
-      await prisma.session.deleteMany({ where: { employeeId: workerEmployeeId } });
-      await prisma.employee.deleteMany({ where: { id: workerEmployeeId } });
-    }
+
     if (adminUserId) await prisma.user.deleteMany({ where: { id: adminUserId } });
-    if (workerUserId) await prisma.user.deleteMany({ where: { id: workerUserId } });
+
     if (companyId) await prisma.company.deleteMany({ where: { id: companyId } });
 
-    companyId = adminUserId = adminEmployeeId = workerUserId = workerEmployeeId = entryId = null;
+    companyId = adminUserId = adminEmployeeId = entryId = null;
+
   });
 
   it("soft-deletes an entry in same company (admin-only) -> deletedAt set + activityEvent + requestId", async () => {
@@ -68,27 +64,12 @@ describe("/api/admin/hours/[id]/delete — admin happy path", () => {
       },
     });
 
-    const workerUser = await prisma.user.create({
-      data: { email: `worker.delete+${Date.now()}@test.com`, passwordHash: "x" },
-    });
-    workerUserId = workerUser.id;
 
-    const workerEmployee = await prisma.employee.create({
-      data: {
-        userId: workerUser.id,
-        companyId: company.id,
-        role: "EMPLOYEE",
-        status: "ACTIVE",
-        isActive: true,
-        name: "Worker",
-      },
-    });
-    workerEmployeeId = workerEmployee.id;
 
     const entry = await prisma.hourEntry.create({
       data: {
         companyId: company.id,
-        employeeId: workerEmployee.id,
+        employeeId: adminEmployee.id,
         projectId: null,
         workDate: new Date("2026-01-01"),
         fromTime: "08:00",
