@@ -70,8 +70,7 @@ export async function GET(req: Request) {
       });
 
       if (!exists) {
-        return failNext("VALIDATION", "Invalid employeeId", 400);
-
+        return failNext("VALIDATION", "Invalid employeeId", 400, undefined, requestId);
       }
     }
 
