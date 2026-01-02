@@ -14,7 +14,13 @@ describe("/api/employee/hours/[id] — employee happy paths", () => {
     let companyId: number | null = null;
     let userId: number | null = null;
     let employeeId: number | null = null;
+
+    let companyIdB: number | null = null;
+    let userIdB: number | null = null;
+    let employeeIdB: number | null = null;
+
     let entryId: number | null = null;
+
 
     afterEach(async () => {
         if (entryId) {
@@ -40,10 +46,29 @@ describe("/api/employee/hours/[id] — employee happy paths", () => {
             await prisma.company.deleteMany({ where: { id: companyId } });
         }
 
+        if (employeeIdB) {
+            await prisma.session.deleteMany({ where: { employeeId: employeeIdB } });
+            await prisma.hourEntry.deleteMany({ where: { employeeId: employeeIdB } });
+            await prisma.employee.deleteMany({ where: { id: employeeIdB } });
+        }
+
+        if (userIdB) {
+            await prisma.user.deleteMany({ where: { id: userIdB } });
+        }
+
+        if (companyIdB) {
+            await prisma.company.deleteMany({ where: { id: companyIdB } });
+        }
+
+
         companyId = null;
         userId = null;
         employeeId = null;
         entryId = null;
+        companyIdB = null;
+        userIdB = null;
+        employeeIdB = null;
+
     });
 
     it("updates employee-owned entry and returns updated row (tenant-safe)", async () => {
@@ -229,6 +254,130 @@ describe("/api/employee/hours/[id] — employee happy paths", () => {
 
         // prevent cleanup from trying to delete already-deleted row
         entryId = null;
+    });
+    it("cross-tenant PATCH denied: Company B cannot update Company A hour entry by id (no mutation, no audit)", async () => {
+        // Company A
+        const companyA = await prisma.company.create({ data: { name: "Tenant A Co" } });
+        companyId = companyA.id;
+
+        const userA = await prisma.user.create({
+            data: {
+                email: `tenantA.hours+${Date.now()}@test.com`,
+                passwordHash: "not-used",
+            },
+        });
+        userId = userA.id;
+
+        const empA = await prisma.employee.create({
+            data: {
+                userId: userA.id,
+                companyId: companyA.id,
+                role: "EMPLOYEE",
+                status: "ACTIVE",
+                isActive: true,
+                name: "Tenant A Employee",
+            },
+        });
+        employeeId = empA.id;
+
+        const entryA = await prisma.hourEntry.create({
+            data: {
+                companyId: companyA.id,
+                employeeId: empA.id,
+                projectId: null,
+                workDate: new Date("2026-01-01"),
+                fromTime: "08:00",
+                toTime: "16:00",
+                breakMinutes: 30,
+                hoursNet: 7.5,
+                hoursBrut: 7.5,
+                description: "A before",
+                status: "PENDING",
+            },
+        });
+        entryId = entryA.id;
+
+        // Company B (attacker)
+        const companyB = await prisma.company.create({ data: { name: "Tenant B Co" } });
+        companyIdB = companyB.id;
+
+        const userB = await prisma.user.create({
+            data: {
+                email: `tenantB.hours+${Date.now()}@test.com`,
+                passwordHash: "not-used",
+            },
+        });
+        userIdB = userB.id;
+
+        const empB = await prisma.employee.create({
+            data: {
+                userId: userB.id,
+                companyId: companyB.id,
+                role: "EMPLOYEE",
+                status: "ACTIVE",
+                isActive: true,
+                name: "Tenant B Employee",
+            },
+        });
+        employeeIdB = empB.id;
+
+        const tokenB = randomBytes(32).toString("hex");
+        await prisma.session.create({
+            data: {
+                tokenHash: sha256Hex(tokenB),
+                employeeId: empB.id,
+                companyId: companyB.id,
+                expiresAt: new Date(Date.now() + 60_000),
+            },
+        });
+
+        // Snapshot before
+        const before = await prisma.hourEntry.findUnique({ where: { id: entryA.id } });
+        if (!before) throw new Error("Expected hour entry A to exist");
+
+        const auditBefore = await prisma.activityEvent.count({
+            where: { companyId: companyA.id, entityType: "HOUR_ENTRY", entityId: entryA.id },
+        });
+
+        // Attack: try to patch A's entry using B session
+        const req = new Request(`http://test/api/employee/hours/${entryA.id}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                cookie: `${SESSION_COOKIE}=${tokenB}`,
+            },
+            body: JSON.stringify({ description: "B tried to change this" }),
+        });
+
+        const res = await PATCH(req as any, {
+            params: Promise.resolve({ id: String(entryA.id) }),
+        });
+
+        // Expect denied (repo may choose 404 or 403)
+        expect([403, 404]).toContain(res.status);
+
+        const requestId = res.headers.get("x-request-id");
+        expect(requestId).toBeTruthy();
+
+        const body = await res.json();
+        expect(body.ok).toBe(false);
+        expect(body.error?.requestId).toBe(requestId);
+
+        // No mutation
+        const after = await prisma.hourEntry.findUnique({ where: { id: entryA.id } });
+        if (!after) throw new Error("Expected hour entry A to still exist");
+
+        expect(after.companyId).toBe(companyA.id);
+        expect(after.employeeId).toBe(empA.id);
+        expect(after.description).toBe(before.description);
+        expect(after.breakMinutes).toBe(before.breakMinutes);
+        expect(after.status).toBe(before.status);
+
+        // No new audit event for A's entry
+        const auditAfter = await prisma.activityEvent.count({
+            where: { companyId: companyA.id, entityType: "HOUR_ENTRY", entityId: entryA.id },
+        });
+        expect(auditAfter).toBe(auditBefore);
     });
 
 });
