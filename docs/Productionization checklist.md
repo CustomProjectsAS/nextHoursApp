@@ -338,11 +338,11 @@ Global rules (apply to every 3.5 test):
 - “No side effects” rule:
   - A 429 request must not create new DB rows and must not mutate existing rows.
 
-- [ ] `/api/auth/login` rate limits after threshold
-  - [ ] Trigger 429 deterministically (unique limiter key for the test)
-  - [ ] Assert 429 + RATE_LIMIT + requestId + (Retry-After if present)
-  - [ ] Assert no session created for the 429 attempt
-  - [ ] Assert no AuthEvent (or equivalent audit row) created for the 429 attempt (if route writes one)
+- [x] `/api/auth/login` rate limits after threshold
+  - [x] Trigger 429 deterministically (unique limiter key for the test)
+  - [x] Assert 429 + RATE_LIMIT + requestId + (Retry-After if present)
+  - [x] Assert no session created for the 429 attempt
+  - [x] Assert no AuthEvent (or equivalent audit row) created for the 429 attempt (if route writes one)
 
 - [ ] `/api/auth/signup` rate limits after threshold
   - [ ] Trigger 429 deterministically (unique limiter key for the test)
