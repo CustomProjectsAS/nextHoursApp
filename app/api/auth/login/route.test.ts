@@ -223,6 +223,10 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
         expect(body.error?.code).toBe("RATE_LIMIT");
         expect(body.error?.requestId).toBe(requestId);
 
+        // --- Assert: no DB side effects on rate-limit ---
+        const sessions = await prisma.session.findMany();
+        expect(sessions.length).toBe(0);
+
         return; // stop once we hit the limiter
       }
     }
