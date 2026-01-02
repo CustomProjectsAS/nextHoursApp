@@ -345,14 +345,14 @@ Global rules (apply to every 3.5 test):
   - [x] Assert no AuthEvent (or equivalent audit row) created for the 429 attempt (if route writes one)
 
 - [ ] `/api/auth/signup` rate limits after threshold
-  - [ ] Trigger 429 deterministically (unique limiter key for the test)
-  - [ ] Assert 429 + RATE_LIMIT + requestId + Retry-After (if present)
-  - [ ] Assert “429 attempt creates NO extra rows”:
-    - Compare counts taken immediately BEFORE the 429 request vs AFTER it for:
-      - user
-      - company
-      - employee
-      - session (if applicable)
+  - [x] Trigger 429 deterministically (unique limiter key for the test)
+  - [x] Assert 429 + RATE_LIMIT + requestId + Retry-After (if present)
+  - [x] Assert “429 attempt creates NO extra rows”:
+    - [x] Compare counts taken immediately BEFORE the 429 request vs AFTER it for:
+      - [x] user
+      - [x] company
+      - [x] employee
+      - [x] session (if applicable)
   - [ ] Assert no “success” logs/audit rows are written for the 429 attempt (if route writes any)
 
 - [ ] `/api/admin/invite` rate limits after threshold
