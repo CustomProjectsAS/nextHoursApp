@@ -285,13 +285,13 @@ Rules (every 3.4 test must assert ALL):
 - no cross-tenant DB mutation
 - no activityEvent/audit row when the route normally writes one
 
-- [/] Cross-tenant ID access denied (WRITE routes)
+- [x] Cross-tenant ID access denied (WRITE routes)
   - [x] employee: PATCH /api/employee/hours/[id]
         - setup: create hour entry in Company A
         - action: Company B session attempts PATCH using Company A entry id
         - expect: 404 NOT_FOUND (preferred) or 403 FORBIDDEN (if repo standard)
         - prove: DB row unchanged + no audit row created
-  - [ ] admin: POST /api/admin/hours/[id]/approve
+  - [x] admin: POST /api/admin/hours/[id]/approve
         - setup: create PENDING hour entry in Company A
         - action: Company B admin session attempts approve using Company A entry id
         - expect: 404 NOT_FOUND or 403 FORBIDDEN
