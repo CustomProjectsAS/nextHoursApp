@@ -303,23 +303,92 @@ Rules (every 3.4 test must assert ALL):
         - action: Company A admin calls GET
         - expect: response contains only Company A project ids (explicitly assert foreign ids absent)
 
-- [ ] Same numeric id collision proof (explicit)
-  - [ ] At least one test must explicitly prove:
-        create entity in Company A, create entity in Company B,
-        then attempt access/mutation of Company A entity by Company B using Company A numeric id -> denied
-        (include all assertions above)
+[x] Same numeric id collision proof (explicit)
+  Goal: prove we never accidentally rely on “id uniqueness across tenants”.
+  Rule: the handler MUST enforce tenant isolation via companyId (or equivalent) and the test MUST simulate “same-looking ids”.
 
-### 3.5 Rate limit tests (only core)
+  - [x] Required test shape (must include ALL 3):
+    - [x] Setup: create Company A + Company B
+    - [x] Setup: create at least one entity in EACH company (so ids exist on both sides)
+    - [x] Action: use Company B session to access/mutate Company A entity using Company A numeric id
+    - [x] Expect: denied (404 NOT_FOUND preferred), AND:
+      - [x] response contract asserted
+      - [x] x-request-id present (+ error.requestId matches when error)
+      - [x] no cross-tenant DB mutation
+      - [x] no activityEvent/audit row when route normally writes one
+
+  - [x] Minimum coverage requirement:
+    - [x] One WRITE route (employee or admin mutation) uses this pattern
+    - [x] One READ route (list or detail) uses this pattern OR explicitly justified why list route can’t apply
+
+
+
+### 3.5 Rate limit tests (core + deterministic)
+Goal: prove rate limiting is real, deterministic, and cannot create side effects when blocked.
+
+Global rules (apply to every 3.5 test):
+- Tests MUST be deterministic:
+  - Either use a unique key per test (recommended), OR reset limiter state between tests.
+- Every rate-limit response MUST assert:
+  - status 429
+  - error.code = RATE_LIMIT
+  - x-request-id header present
+  - error.requestId matches x-request-id
+  - Retry-After header present (if implemented in route)
+- “No side effects” rule:
+  - A 429 request must not create new DB rows and must not mutate existing rows.
+
 - [ ] `/api/auth/login` rate limits after threshold
-- [ ] `/api/auth/signup` rate limits after threshold
-- [ ] `/api/admin/invite` rate limits after threshold
+  - [ ] Trigger 429 deterministically (unique limiter key for the test)
+  - [ ] Assert 429 + RATE_LIMIT + requestId + (Retry-After if present)
+  - [ ] Assert no session created for the 429 attempt
+  - [ ] Assert no AuthEvent (or equivalent audit row) created for the 429 attempt (if route writes one)
 
-### 3.6 Logging schema (target — not enforced yet)
-- [ ] Standard log fields exist where emitted:
-  - [ ] `requestId`
-  - [ ] `route`
-  - [ ] `companyId` (if available)
-  - [ ] `statusCode` / `errorCode`
+- [ ] `/api/auth/signup` rate limits after threshold
+  - [ ] Trigger 429 deterministically (unique limiter key for the test)
+  - [ ] Assert 429 + RATE_LIMIT + requestId + Retry-After (if present)
+  - [ ] Assert “429 attempt creates NO extra rows”:
+    - Compare counts taken immediately BEFORE the 429 request vs AFTER it for:
+      - user
+      - company
+      - employee
+      - session (if applicable)
+  - [ ] Assert no “success” logs/audit rows are written for the 429 attempt (if route writes any)
+
+- [ ] `/api/admin/invite` rate limits after threshold
+  - [ ] Trigger 429 deterministically (unique limiter key for the test)
+  - [ ] Assert 429 + RATE_LIMIT + requestId + Retry-After (if present)
+  - [ ] Assert no invite created / no employee created / no auth event created on 429
+  - [ ] Assert no email side effect is attempted (if app ever adds email sending, this must remain true)
+
+
+### 3.6 Logging schema (enforced, not aspirational)
+Goal: logs are structured, consistent, and safe — not “whatever the dev felt like today”.
+
+Rules:
+- No console.* in app/api/** (already a Gate 2 invariant)
+- All API routes MUST emit structured logs with a predictable ctx schema.
+- Logging must never leak secrets (passwords, session tokens, invite tokens, raw auth headers).
+
+Required fields:
+- requestId (always)
+- route (always, stable string e.g. "POST /api/admin/hours/[id]/approve")
+- companyId (when ctx exists)
+- employeeId (when ctx exists)
+- statusCode OR errorCode (at least one per request outcome)
+
+Enforcement (must be test-proven):
+- [ ] Unit test: logger output is JSON and includes required top-level keys (ts, level, message/msg, ctx)
+- [ ] Unit test: ctx includes requestId + route for at least one representative API log call
+- [ ] Unit test: redaction works (known sensitive keys are replaced/removed)
+- [ ] API-route test: at least one route emits a warn/error log with ctx containing:
+  - requestId
+  - route
+  - (companyId when authenticated)
+  - errorCode on failure
+
+Completion rule:
+- Mark this section [x] ONLY when the tests exist and pass in CI, not when “we usually include these fields”.
 
 
 ## Gate 4 — CI ⬜ NOT STARTED
