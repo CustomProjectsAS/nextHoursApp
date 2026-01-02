@@ -396,28 +396,28 @@ Completion rule:
 Goal: CI is the enforcement mechanism. If CI is green, main is safe. If CI is red, main is blocked.
 
 ### CI workflow requirements (test-proven by running in GitHub Actions)
-- [ ] GitHub Actions workflow exists at `.github/workflows/ci.yml`
-- [ ] Triggers: push to main + pull_request
-- [ ] Node pinned (e.g. 20.x)
-- [ ] Install uses `npm ci` (lockfile is authoritative)
-- [ ] Cache npm for speed (optional but recommended)
+- [x] GitHub Actions workflow exists at `.github/workflows/ci.yml`
+- [x] Triggers: push to main + pull_request
+- [x] Node pinned (e.g. 20.x)
+- [x] Install uses `npm ci` (lockfile is authoritative)
+- [x] Cache npm for speed (optional but recommended)
 
 ### Database requirements (non-negotiable)
-- [ ] CI uses a local Postgres service container (NOT Render / remote)
-- [ ] `DATABASE_URL` points to CI Postgres with `sslmode=disable`
-- [ ] Prisma is prepared before tests:
-  - [ ] `npx prisma generate`
-  - [ ] `npx prisma migrate deploy` (or `db push` if explicitly chosen)
+- [x] CI uses a local Postgres service container (NOT Render / remote)
+- [x] `DATABASE_URL` points to CI Postgres with `sslmode=disable`
+- [x] Prisma is prepared before tests:
+  - [x] `npx prisma generate`
+  - [x] `npx prisma migrate deploy` (or `db push` if explicitly chosen)
 
 ### Required checks (must all pass)
-- [ ] Typecheck: `npm run typecheck`
-- [ ] Tests (local DB): `npm run test:local`
-- [ ] Build: `npm run build`
+- [x] Typecheck: `npm run typecheck`
+- [x] Tests (local DB): `npm run test:local`
+- [x] Build: `npm run build`
 - [ ] Lint: `npm run lint` (only if lint is actually enforced)
 
 ### Branch protection (blocks main)
-- [ ] Require CI checks to pass before merging
-- [ ] Disallow merge when checks fail
+- [x] Require CI checks to pass before merging
+- [x] Disallow merge when checks fail
 
 
 ## Gate 5 — Minimum Safety ⬜ NOT STARTED
