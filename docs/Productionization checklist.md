@@ -264,13 +264,13 @@ Rule for each API route (to mark [x]):
   - [x] admin: POST /api/admin/hours/[id]/delete happy path
   - [x] one validation failure path (id invalid / forbidden / not found) only forbidden
 
-- [ ] Projects
-  - [ ] admin: POST /api/admin/projects (create) happy path
-  - [ ] admin: PATCH /api/admin/projects/[id] (update) happy path
+- [/] Projects
+  - [x] admin: POST /api/admin/projects (create) happy path
+  - [x] admin: PATCH /api/admin/projects/[id] (update) happy path
   - [ ] admin: POST /api/admin/projects/[id]/disable happy path
 
-- [ ] Employees
-  - [ ] admin: POST /api/admin/invite happy path
+- [/] Employees
+  - [x] admin: POST /api/admin/invite happy path
   - [ ] legacy endpoint returns 410
 
 
