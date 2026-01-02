@@ -392,41 +392,70 @@ Completion rule:
 - Mark this section [x] ONLY when the tests exist and pass in CI, not when “we usually include these fields”.
 
 
-## Gate 4 — CI ⬜ NOT STARTED
+## Gate 4 — CI ⏳ In progress
 Goal: CI is the enforcement mechanism. If CI is green, main is safe. If CI is red, main is blocked.
 
-### CI workflow requirements (test-proven by running in GitHub Actions)
+### CI workflow requirements (test-proven by running in GitHub Actions) ✅ Done
 - [x] GitHub Actions workflow exists at `.github/workflows/ci.yml`
 - [x] Triggers: push to main + pull_request
 - [x] Node pinned (e.g. 20.x)
 - [x] Install uses `npm ci` (lockfile is authoritative)
 - [x] Cache npm for speed (optional but recommended)
 
-### Database requirements (non-negotiable)
+### Database requirements (non-negotiable) ✅ Done
 - [x] CI uses a local Postgres service container (NOT Render / remote)
 - [x] `DATABASE_URL` points to CI Postgres with `sslmode=disable`
 - [x] Prisma is prepared before tests:
   - [x] `npx prisma generate`
   - [x] `npx prisma migrate deploy` (or `db push` if explicitly chosen)
 
-### Required checks (must all pass)
+### Required checks (must all pass)⏳ In progress
 - [x] Typecheck: `npm run typecheck`
 - [x] Tests (local DB): `npm run test:local`
 - [x] Build: `npm run build`
-- [ ] Lint: `npm run lint` (only if lint is actually enforced)
+- [ ] Lint: `npm run lint` (available but not enforced)
 
-### Branch protection (blocks main)
+### Branch protection (blocks main) ✅ Done
 - [x] Require CI checks to pass before merging
 - [x] Disallow merge when checks fail
 
 
 ## Gate 5 — Minimum Safety ⬜ NOT STARTED
-- [ ] Startup env validation
-- [ ] Session cookie config verified
-- [ ] Invite tokens never logged (prove via grep + logger redaction)
-- [ ] `rejectUnauthorized:false` not used in prod
+Goal: prevent the most common production foot-guns (secrets leaks, insecure cookies, unsafe TLS, missing env).
 
----
+### 5.1 Startup env validation (fail fast)
+- [ ] Add `lib/env.ts` that validates required env vars at startup (throws with clear message)
+- [ ] Unit test: missing required env var fails validation (does not boot silently)
+- [ ] Env list is explicit (no “optional by accident”):
+  - [ ] `DATABASE_URL`
+  - [ ] `APP_ENV` (development/test/production) or equivalent
+  - [ ] any auth secret / pepper used for hashing/HMAC (if applicable)
+
+### 5.2 Session cookie safety (verified by tests)
+- [ ] Canonical cookie settings defined in one place (no scattered literals)
+- [ ] In production:
+  - [ ] `HttpOnly=true`
+  - [ ] `Secure=true`f
+  - [ ] `SameSite=Lax` (or Strict if you explicitly choose)
+  - [ ] `Path=/`
+  - [ ] Reasonable TTL / Max-Age aligned with session expiry rules
+- [ ] In dev/test: Secure may be false only when running on http://localhost
+- [ ] Route test: login sets cookie with expected flags in production-mode simulation
+- [ ] Route test: logout clears cookie (Max-Age=0/Expires) and revokes session
+
+### 5.3 Secrets never logged (prove, don’t claim)
+- [ ] Unit test: logger redacts known sensitive keys (password, sessionToken, inviteToken, authorization, cookie, set-cookie)
+- [ ] Repo proof: grep shows no direct logging of invite tokens or auth headers
+  - [ ] `Select-String` checks committed as a note or scripted check (not manual “trust me”)
+- [ ] API-route test: failure logs include requestId+route+errorCode but never include secrets
+
+### 5.4 TLS / HTTPS safety (rejectUnauthorized)
+- [x] Repo proof: no `rejectUnauthorized:false` outside test/dev-only files
+- [ ] If any exception exists, it must be behind `if (process.env.NODE_ENV !== "production")` and covered by a test/grep
+
+### Completion rule
+- Mark Gate 5 ✅ DONE only when tests/grep proofs exist and pass in CI.
+
 
 ## CURRENT POSITION
 - Gate 1: ✅ DONE
