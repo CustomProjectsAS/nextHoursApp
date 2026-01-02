@@ -58,7 +58,7 @@ export async function POST(
     await prisma.activityEvent.create({
       data: {
         companyId: ctx.companyId,
-        actorType: "EMPLOYEE",
+        actorType: ctx.role,
         actorId: ctx.employeeId,
         actorName: ctx.name ?? null,
         entityType: "HOUR_ENTRY",
@@ -72,8 +72,9 @@ export async function POST(
       },
     });
 
+
     return okNext({ entry: updated }, undefined, requestId);
-    
+
   } catch (err: any) {
     log.error("INTERNAL: admin/hours/[id]/approve POST", {
       requestId,

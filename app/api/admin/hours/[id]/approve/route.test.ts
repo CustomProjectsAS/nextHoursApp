@@ -166,13 +166,17 @@ describe("/api/admin/hours/[id]/approve — admin happy path", () => {
     expect(db.rejectReason).toBeNull();
 
     const ev = await prisma.activityEvent.findFirst({
-      where: {
-        companyId: company.id,
-        entityType: "HOUR_ENTRY",
-        entityId: existing.id,
-        eventType: "HOUR_APPROVED",
-      },
-    });
-    expect(ev).toBeTruthy();
+  where: {
+    companyId: company.id,
+    entityType: "HOUR_ENTRY",
+    entityId: existing.id,
+    eventType: "HOUR_APPROVED",
+  },
+});
+
+expect(ev).toBeTruthy();
+expect(ev!.actorType).toBe("ADMIN");
+expect(ev!.actorId).toBe(adminEmployee.id);
+
   });
 });
