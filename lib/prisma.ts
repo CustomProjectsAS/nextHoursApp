@@ -8,12 +8,15 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
+const isProd = process.env.NODE_ENV === "production";
+
+// Safer default: in production, require TLS with normal certificate verification.
+// In dev/test, default to no SSL (local Postgres), unless DATABASE_URL demands otherwise.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false, // required by many managed Postgres providers (Render, etc.)
-  },
+  ssl: isProd ? true : undefined,
 });
+
 
 const adapter = new PrismaPg(pool);
 
