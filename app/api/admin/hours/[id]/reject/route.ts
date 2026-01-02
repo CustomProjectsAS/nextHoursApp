@@ -63,7 +63,7 @@ export async function POST(
         await prisma.activityEvent.create({
             data: {
                 companyId: ctx.companyId,
-                actorType: "EMPLOYEE",
+                actorType: ctx.role,
                 actorId: ctx.employeeId,
                 actorName: ctx.name ?? null,
                 entityType: "HOUR_ENTRY",
