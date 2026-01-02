@@ -259,8 +259,8 @@ Rule for each API route (to mark [x]):
   - [x] employee: POST /api/employee/hours (create) happy path
   - [x] employee: PATCH /api/employee/hours/[id] (update) happy path
   - [x] employee: DELETE /api/employee/hours/[id] (delete) happy path (PENDING only)
-  - [ ] admin: POST /api/admin/hours/[id]/approve happy path
-  - [ ] admin: POST /api/admin/hours/[id]/reject happy path
+  - [x] admin: POST /api/admin/hours/[id]/approve happy path
+  - [x] admin: POST /api/admin/hours/[id]/reject happy path
   - [ ] admin: POST /api/admin/hours/[id]/delete happy path
   - [ ] one validation failure path (id invalid / forbidden / not found)
 
