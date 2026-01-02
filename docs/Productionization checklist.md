@@ -274,12 +274,40 @@ Rule for each API route (to mark [x]):
   - [x] legacy endpoint returns 410
 
 
-### 3.4 Tenant isolation tests (killer checks)
-- [ ] Cross-tenant access denied for:
-  - hours by id
-  - project by id
-  - employee by id
-- [ ] At least one test proves “same numeric id in another company” cannot be accessed
+## 3.4 Tenant isolation tests (killer checks)
+Goal: prove cross-tenant access is impossible at the handler level. These tests are minimal but catastrophic-risk destroying.
+
+Rules (every 3.4 test must assert ALL):
+- HTTP status
+- canonical response contract ({ ok } shape)
+- x-request-id header present
+- error.requestId equals x-request-id (for error responses)
+- no cross-tenant DB mutation
+- no activityEvent/audit row when the route normally writes one
+
+- [/] Cross-tenant ID access denied (WRITE routes)
+  - [x] employee: PATCH /api/employee/hours/[id]
+        - setup: create hour entry in Company A
+        - action: Company B session attempts PATCH using Company A entry id
+        - expect: 404 NOT_FOUND (preferred) or 403 FORBIDDEN (if repo standard)
+        - prove: DB row unchanged + no audit row created
+  - [ ] admin: POST /api/admin/hours/[id]/approve
+        - setup: create PENDING hour entry in Company A
+        - action: Company B admin session attempts approve using Company A entry id
+        - expect: 404 NOT_FOUND or 403 FORBIDDEN
+        - prove: status remains PENDING + no activityEvent created
+
+- [ ] Cross-tenant ID access denied (READ/list route)
+  - [ ] admin: GET /api/admin/projects
+        - setup: create projects in Company A and Company B
+        - action: Company A admin calls GET
+        - expect: response contains only Company A project ids (explicitly assert foreign ids absent)
+
+- [ ] Same numeric id collision proof (explicit)
+  - [ ] At least one test must explicitly prove:
+        create entity in Company A, create entity in Company B,
+        then attempt access/mutation of Company A entity by Company B using Company A numeric id -> denied
+        (include all assertions above)
 
 ### 3.5 Rate limit tests (only core)
 - [ ] `/api/auth/login` rate limits after threshold
