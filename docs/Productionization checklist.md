@@ -212,7 +212,7 @@ Rule for each API route (to mark [x]):
 
 ---
 
-## Gate 3 — Runtime proof + Tests ⏳ In progress
+## Gate 3 — Runtime proof + Tests ⏳ In progress 
 
 ### 3.1 Runtime RequestId proof (curl-level) ✅ Done
 - [x] Success responses include `x-request-id` header
@@ -274,7 +274,7 @@ Rule for each API route (to mark [x]):
   - [x] legacy endpoint returns 410
 
 
-## 3.4 Tenant isolation tests (killer checks)
+### 3.4 Tenant isolation tests (killer checks) ✅ Done
 Goal: prove cross-tenant access is impossible at the handler level. These tests are minimal but catastrophic-risk destroying.
 
 Rules (every 3.4 test must assert ALL):
