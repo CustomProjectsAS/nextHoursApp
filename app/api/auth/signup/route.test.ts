@@ -116,45 +116,64 @@ describe("POST /api/auth/signup", () => {
         expect(typeof json.error?.requestId).toBe("string");
     });
 
-      it("rate limit exceeded (IP) -> 429 RATE_LIMIT + Retry-After + requestId", async () => {
-    const base = {
-      companyName: "SpamCo",
-      name: "Spammer",
-      password: "very-strong-password",
-    };
+    it("rate limit exceeded (IP) -> 429 RATE_LIMIT + Retry-After + requestId", async () => {
+        const base = {
+            companyName: "SpamCo",
+            name: "Spammer",
+            password: "very-strong-password",
+        };
 
-    // Signup route limits by IP: 10 signups / 15 minutes.
-    // Keep IP constant, vary email to avoid duplicate-email and email/day limiter.
-    for (let i = 0; i < 11; i++) {
-      const req = new Request("http://localhost/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-forwarded-for": "203.0.113.10",
-        },
-        body: JSON.stringify({
-          ...base,
-          companyName: `SpamCo-${i}`,
-          email: `spam+${i}@test.no`,
-        }),
-      });
 
-      const res = await POST(req);
 
-      if (i < 10) {
-        expect(res.status).toBe(200);
-      } else {
-        expect(res.status).toBe(429);
-        expect(res.headers.get("Retry-After")).toBeTruthy();
-        expect(res.headers.get("x-request-id")).toBeTruthy();
 
-        const json = await res.json();
-        expect(json.ok).toBe(false);
-        expect(json.error?.code).toBe("RATE_LIMIT");
-        expect(typeof json.error?.requestId).toBe("string");
-        expect(json.error.requestId.length).toBeGreaterThan(0);
-      }
-    }
+        // Signup route limits by IP: 10 signups / 15 minutes.
+        // Keep IP constant, vary email to avoid duplicate-email and email/day limiter.
+        for (let i = 0; i < 11; i++) {
+            const req = new Request("http://localhost/api/auth/signup", {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                    "x-forwarded-for": "203.0.113.10",
+                },
+                body: JSON.stringify({
+                    ...base,
+                    companyName: `SpamCo-${i}`,
+                    email: `spam+${i}@test.no`,
+                }),
+            });
 
-  }, 30_000);  
+            const res = await POST(req);
+
+            if (i < 10) {
+                expect(res.status).toBe(200);
+            } else {
+                const before429 = {
+                    users: await prisma.user.count(),
+                    companies: await prisma.company.count(),
+                    employees: await prisma.employee.count(),
+                    sessions: await prisma.session.count(),
+                };
+
+                expect(res.status).toBe(429);
+                expect(res.headers.get("Retry-After")).toBeTruthy();
+                expect(res.headers.get("x-request-id")).toBeTruthy();
+
+                const json = await res.json();
+                expect(json.ok).toBe(false);
+                expect(json.error?.code).toBe("RATE_LIMIT");
+                expect(typeof json.error?.requestId).toBe("string");
+                expect(json.error.requestId.length).toBeGreaterThan(0);
+                const after = {
+                    users: await prisma.user.count(),
+                    companies: await prisma.company.count(),
+                    employees: await prisma.employee.count(),
+                    sessions: await prisma.session.count(),
+                };
+
+                expect(after).toEqual(before429);
+
+            }
+        }
+
+    }, 30_000);
 });
