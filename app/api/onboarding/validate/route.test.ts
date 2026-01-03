@@ -2,6 +2,8 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { rateLimit } from "@/lib/rateLimit";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import * as logModule from "@/lib/log";
+
 vi.mock("@/lib/rateLimit", () => {
   return {
     rateLimit: vi.fn(async () => ({
@@ -316,5 +318,5 @@ describe("GET /api/onboarding/validate", () => {
       },
     });
   });
-
+ 
 });
