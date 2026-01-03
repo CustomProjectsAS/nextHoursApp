@@ -432,7 +432,7 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
   - [ ] any auth secret / pepper used for hashing/HMAC (if applicable)
 
 ### 5.2 Session cookie safety (verified by tests)
-- [ ] Canonical cookie settings defined in one place (no scattered literals)
+- [x] Canonical cookie settings defined in one place (no scattered literals)
 - [ ] In production:
   - [ ] `HttpOnly=true`
   - [ ] `Secure=true`
@@ -441,7 +441,7 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
   - [ ] Reasonable TTL / Max-Age aligned with session expiry rules
 - [ ] In dev/test: Secure may be false only when running on http://localhost
 - [ ] Route test: login sets cookie with expected flags in production-mode simulation
-- [ ] Route test: logout clears cookie (Max-Age=0/Expires) and revokes session
+- [x] Route test: logout clears cookie (Max-Age=0/Expires) and revokes session
 
 ### 5.3 Secrets never logged (prove, don’t claim)
 - [ ] Unit test: logger redacts known sensitive keys (password, sessionToken, inviteToken, authorization, cookie, set-cookie)
