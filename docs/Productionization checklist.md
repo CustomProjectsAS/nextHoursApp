@@ -462,4 +462,4 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
 - Gate 2: ✅ DONE
 - Gate 3: ✅ DONE
 - Gate 4: ⏳ IN PROGRESS
-- Gate 5: ⬜
+- Gate 5: ⏳ IN PROGRESS
