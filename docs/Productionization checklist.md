@@ -434,12 +434,9 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
 
 ### 5.2 Session cookie safety (verified by tests)
 - [x] Canonical cookie settings defined in one place (no scattered literals)
-- [ ] In production:
-  - [ ] `HttpOnly=true`
-  - [ ] `Secure=true`
-  - [ ] `SameSite=Lax` (or Strict if you explicitly choose)
-  - [ ] `Path=/`
-  - [ ] Reasonable TTL / Max-Age aligned with session expiry rules
+- [ ] Cookie security behavior is enforced exclusively via route-level tests:
+  - production-mode tests assert all required flags
+  - dev/test behavior differences are implicitly validated by NODE_ENV
 - [ ] In dev/test: Secure may be false only when running on http://localhost
 - [x] Route test: login sets cookie with expected flags in production-mode simulation
 - [x] Route test: logout clears cookie (Max-Age=0/Expires) and revokes session
