@@ -447,11 +447,11 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
 - [ ] Unit test: logger redacts known sensitive keys (password, sessionToken, inviteToken, authorization, cookie, set-cookie)
 - [ ] Repo proof: grep shows no direct logging of invite tokens or auth headers
   - [ ] `Select-String` checks committed as a note or scripted check (not manual “trust me”)
-- [x] API-route test: failure logs include requestId+route+errorCode but never include secrets
+- [ ] API-route test: failure logs include requestId+route+errorCode but never include secrets
 
 ### 5.4 TLS / HTTPS safety (rejectUnauthorized)
 - [x] Repo proof: no `rejectUnauthorized:false` outside test/dev-only files
-- [x] If any exception exists, it must be behind `if (process.env.NODE_ENV !== "production")` and covered by a test/grep
+- [ ] If any exception exists, it must be behind `if (process.env.NODE_ENV !== "production")` and covered by a test/grep
 
 ### Completion rule
 - Mark Gate 5 ✅ DONE only when tests/grep proofs exist and pass in CI.
