@@ -428,8 +428,9 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
 - [x] Unit test: missing required env var fails validation (does not boot silently)
 - [ ] Env list is explicit (no “optional by accident”):
   - [x] `DATABASE_URL`
-  - [ ] `APP_ENV` (development/test/production) or equivalent
-  - [ ] any auth secret / pepper used for hashing/HMAC (if applicable)
+  - [x] NODE_ENV (development/test/production) or equivalent
+  - [x] any auth secret / pepper used for hashing/HMAC (if applicable)
+  - [ ] Repo proof: grep shows no direct process.env reads outside lib/env.ts (except explicitly allowed files)
 
 ### 5.2 Session cookie safety (verified by tests)
 - [x] Canonical cookie settings defined in one place (no scattered literals)
@@ -440,7 +441,7 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
   - [ ] `Path=/`
   - [ ] Reasonable TTL / Max-Age aligned with session expiry rules
 - [ ] In dev/test: Secure may be false only when running on http://localhost
-- [ ] Route test: login sets cookie with expected flags in production-mode simulation
+- [x] Route test: login sets cookie with expected flags in production-mode simulation
 - [x] Route test: logout clears cookie (Max-Age=0/Expires) and revokes session
 
 ### 5.3 Secrets never logged (prove, don’t claim)
