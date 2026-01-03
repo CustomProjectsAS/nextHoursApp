@@ -5,6 +5,8 @@ import { rateLimit } from "@/lib/rateLimit";
 import { okNext, failNext } from "@/lib/api/nextResponse";
 import { withRequestId } from "@/lib/api/withRequestId";
 import { log } from "@/lib/log";
+import { env } from "@/lib/env";
+
 
 const SESSION_COOKIE = "cph_session";
 const SESSION_DAYS = 30;
@@ -170,7 +172,7 @@ export const POST = withRequestId(async (req, requestId) => {
 
     res.cookies.set(SESSION_COOKIE, rawToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
       maxAge: SESSION_DAYS * 24 * 60 * 60,
