@@ -1,7 +1,38 @@
 import { prisma } from "@/lib/prisma";
 import { createHash, createHmac } from "crypto";
 
-const SESSION_COOKIE = "cph_session";
+export const SESSION_COOKIE = "cph_session";
+export const SESSION_DAYS = 30;
+
+function isProd() {
+  return process.env.NODE_ENV === "production";
+}
+
+export function setSessionCookie(
+  res: { cookies: { set: Function } },
+  token: string,
+) {
+  res.cookies.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: isProd(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
+  });
+}
+
+export function clearSessionCookie(
+  res: { cookies: { set: Function } },
+) {
+  res.cookies.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    secure: isProd(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
 
 export type AuthContext = {
   employeeId: number;

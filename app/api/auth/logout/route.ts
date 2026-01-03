@@ -3,8 +3,7 @@ import { createHash } from "crypto";
 import { okNext } from "@/lib/api/nextResponse";
 import { withRequestId } from "@/lib/api/withRequestId";
 import { log } from "@/lib/log";
-
-const SESSION_COOKIE = "cph_session";
+import { SESSION_COOKIE, clearSessionCookie } from "@/lib/auth";
 
 function sha256Hex(input: string) {
   return createHash("sha256").update(input).digest("hex");
@@ -27,13 +26,7 @@ export const POST = withRequestId(async (req, requestId) => {
     const res = okNext({}, undefined, requestId);
 
     // Clear cookie no matter what
-    res.cookies.set(SESSION_COOKIE, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-    });
+    clearSessionCookie(res);
 
     if (!token) {
       log.info("LOGOUT_NO_TOKEN", { requestId, path: "/api/auth/logout" });
@@ -104,13 +97,8 @@ export const POST = withRequestId(async (req, requestId) => {
 
     // Still clear cookie even if DB update failed
     const res = okNext({}, undefined, requestId);
-    res.cookies.set(SESSION_COOKIE, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-    });
+    clearSessionCookie(res);
+
     return res;
   }
 });
