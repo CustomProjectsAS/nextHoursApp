@@ -447,11 +447,11 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
 - [x] Unit test: logger redacts known sensitive keys (password, sessionToken, inviteToken, authorization, cookie, set-cookie)
 - [x] Repo proof: repo-proof test fails CI if any non-test TS/TSX logs secret-bearing identifiers (auth headers/cookies/invite tokens/etc.)
   - Proof: `lib/log.repo-proof.test.ts` (repo scan; excludes *.test.ts and allows lib/log.ts)
-- [ ] API-route test: failure logs include requestId+route+errorCode but never include secrets
+- [x] API-route test: failure logs include requestId+route+errorCode but never include secrets
 
 ### 5.4 TLS / HTTPS safety (rejectUnauthorized)
-- [x] Repo proof: no `rejectUnauthorized:false` outside test/dev-only files
-- [ ] If any exception exists, it must be behind `if (process.env.NODE_ENV !== "production")` and covered by a test/grep
+- [x] Repo proof: no `rejectUnauthorized: false` outside test files
+  - Proof: `lib/tls.repo-proof.test.ts`
 
 ### Completion rule
 - Mark Gate 5 ✅ DONE only when tests/grep proofs exist and pass in CI.
