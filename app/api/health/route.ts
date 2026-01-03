@@ -2,13 +2,15 @@ import { prisma } from "@/lib/prisma";
 import { okNext, failNext } from "@/lib/api/nextResponse";
 import { getOrCreateRequestId } from "@/lib/requestId";
 import { log } from "@/lib/log";
+import { env } from "@/lib/env";
+
 
 export async function GET(req: Request) {
   const requestId = getOrCreateRequestId(req);
   const route = "GET /api/health";
 
 
-  const version = process.env.APP_VERSION ?? "unknown";
+  const version = env.APP_VERSION ?? "unknown";
   const timestamp = new Date().toISOString();
 
   try {
