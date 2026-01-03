@@ -423,10 +423,10 @@ Goal: CI is the enforcement mechanism. If CI is green, main is safe. If CI is re
 ## Gate 5 — Minimum Safety ⏳ IN PROGRESS
 Goal: prevent the most common production foot-guns (secrets leaks, insecure cookies, unsafe TLS, missing env).
 
-### 5.1 Startup env validation (fail fast)
+### 5.1 Startup env validation (fail fast) ✅ DONE
 - [x] Add `lib/env.ts` that validates required env vars at startup (throws with clear message)
 - [x] Unit test: missing required env var fails validation (does not boot silently)
-- [ ] Env list is explicit (no “optional by accident”):
+- [x] Env list is explicit (no “optional by accident”):
   - [x] `DATABASE_URL`
   - [x] NODE_ENV (development/test/production) or equivalent
   - [x] any auth secret / pepper used for hashing/HMAC (if applicable)
