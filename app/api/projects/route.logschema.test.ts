@@ -41,5 +41,24 @@ describe("Logging schema (API route): GET /api/projects", () => {
         expect(rec.ctx.requestId).toBeTruthy();
         expect(rec.ctx.route).toBe("GET /api/projects");
         expect(rec.ctx.errorCode).toBe("AUTH_REQUIRED");
+                const rawLines = warnSpy.mock.calls
+            .map(c => c[0])
+            .filter(v => typeof v === "string")
+            .join("\n")
+            .toLowerCase();
+
+        // Gate 5.3: secrets must never appear in logs
+        expect(rawLines).not.toContain("authorization");
+        expect(rawLines).not.toContain("bearer ");
+        expect(rawLines).not.toContain("cookie");
+        expect(rawLines).not.toContain("set-cookie");
+        expect(rawLines).not.toContain("invitetoken");
+        expect(rawLines).not.toContain("access_token");
+        expect(rawLines).not.toContain("refresh_token");
+        expect(rawLines).not.toContain("id_token");
+        expect(rawLines).not.toContain("client_secret");
+        expect(rawLines).not.toContain("auth_secret");
+        expect(rawLines).not.toContain("database_url");
+
     });
 });
