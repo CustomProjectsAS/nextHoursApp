@@ -444,7 +444,7 @@ Goal: prevent the most common production foot-guns (secrets leaks, insecure cook
 
 
 ### 5.3 Secrets never logged (prove, don’t claim)
-- [ ] Unit test: logger redacts known sensitive keys (password, sessionToken, inviteToken, authorization, cookie, set-cookie)
+- [x] Unit test: logger redacts known sensitive keys (password, sessionToken, inviteToken, authorization, cookie, set-cookie)
 - [ ] Repo proof: grep shows no direct logging of invite tokens or auth headers
   - [ ] `Select-String` checks committed as a note or scripted check (not manual “trust me”)
 - [ ] API-route test: failure logs include requestId+route+errorCode but never include secrets
