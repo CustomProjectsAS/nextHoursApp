@@ -27,6 +27,12 @@ export const env = (() => {
         NODE_ENV: nodeEnv,
         DATABASE_URL: required("DATABASE_URL"),
         AUTH_SECRET: required("AUTH_SECRET"),
+
+        // Optional runtime config (must still be centralized here to satisfy Gate 5.1)
+        NEXT_PUBLIC_APP_URL: optional("NEXT_PUBLIC_APP_URL"),
+        APP_URL: optional("APP_URL"),
+        APP_VERSION: optional("APP_VERSION"),
     } as const;
+
 
 })();

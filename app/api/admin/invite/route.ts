@@ -7,6 +7,8 @@ import { okNext, failNext } from "@/lib/api/nextResponse";
 import { z } from "zod";
 import { getOrCreateRequestId } from "@/lib/requestId";
 import { log } from "@/lib/log";
+import { env } from "@/lib/env";
+
 
 
 function generateInviteToken() {
@@ -66,7 +68,7 @@ export async function POST(req: Request) {
         windowSeconds: 600,
         limit: 30,
     });
-       if (!ipLimit.ok) {
+    if (!ipLimit.ok) {
         return failNext("RATE_LIMIT", "Too many invites. Try again later.", 429, undefined, requestId);
     }
 
@@ -79,7 +81,7 @@ export async function POST(req: Request) {
         windowSeconds: 600,
         limit: 20,
     });
-        if (!actorLimit.ok) {
+    if (!actorLimit.ok) {
         return failNext("RATE_LIMIT", "Too many invites. Try again later.", 429, undefined, requestId);
     }
 
@@ -139,21 +141,22 @@ export async function POST(req: Request) {
 
 
         const baseUrl =
-            process.env.NEXT_PUBLIC_APP_URL ??
-            process.env.APP_URL ??
+            env.NEXT_PUBLIC_APP_URL ??
+            env.APP_URL ??
             "http://localhost:3000";
+
 
         const inviteUrl = `${baseUrl}/onboarding?token=${inviteTokenRaw}`;
 
 
-                return okNext(
-          {
-            employeeId: employee.id,
-            inviteLink: inviteUrl,
-            expiresAt: employee.inviteExpiresAt,
-          },
-          undefined,
-          requestId
+        return okNext(
+            {
+                employeeId: employee.id,
+                inviteLink: inviteUrl,
+                expiresAt: employee.inviteExpiresAt,
+            },
+            undefined,
+            requestId
         );
 
 

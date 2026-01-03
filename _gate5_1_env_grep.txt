@@ -1,0 +1,23 @@
+﻿D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\app\api\auth\login\choose-company\route.test.ts:34:        const prevSecret = process.env.AUTH_SECRET;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\app\api\auth\login\choose-company\route.test.ts:35:        process.env.AUTH_SECRET =
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\app\api\auth\login\choose-company\route.test.ts:111:        process.env.AUTH_SECRET = prevSecret;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\app\api\auth\login\choose-company\route.test.ts:115:        const prevSecret = process.env.AUTH_SECRET;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\app\api\auth\login\choose-company\route.test.ts:116:        process.env.AUTH_SECRET =
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\app\api\auth\login\choose-company\route.test.ts:223:        process.env.AUTH_SECRET = prevSecret;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\app\api\auth\login\route.test.ts:97:    if (process.env.NODE_ENV === "production") {
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:10:    const prevDb = process.env.DATABASE_URL;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:11:    const prevSecret = process.env.AUTH_SECRET;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:13:    delete process.env.DATABASE_URL;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:14:    process.env.AUTH_SECRET = "test-secret";
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:18:    if (prevDb !== undefined) process.env.DATABASE_URL = prevDb;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:19:    else delete process.env.DATABASE_URL;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:21:    if (prevSecret !== undefined) process.env.AUTH_SECRET = prevSecret;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:22:    else delete process.env.AUTH_SECRET;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:26:    const prevDb = process.env.DATABASE_URL;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:27:    const prevSecret = process.env.AUTH_SECRET;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:29:    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:30:    delete process.env.AUTH_SECRET;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:35:    if (prevDb !== undefined) process.env.DATABASE_URL = prevDb;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:36:    else delete process.env.DATABASE_URL;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:38:    if (prevSecret !== undefined) process.env.AUTH_SECRET = prevSecret;
+D:\Priv\CustomP\ITServices\CustomHours\modernHours\hours-app\lib\env.test.ts:39:    else delete process.env.AUTH_SECRET;
