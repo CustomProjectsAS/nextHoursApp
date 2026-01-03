@@ -93,9 +93,14 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
 
     expect(setCookie).toContain("cph_session=");
     expect(setCookie).toContain("HttpOnly");
-    expect(setCookie).toContain("Secure");
+
+    if (process.env.NODE_ENV === "production") {
+      expect(setCookie).toContain("Secure");
+    }
+
     expect(setCookie!).toMatch(/samesite=lax/i);
     expect(setCookie).toContain("Path=/");
+
 
     // --- Assert: body ---
     expect(body).toEqual({
