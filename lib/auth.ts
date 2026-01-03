@@ -1,12 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { createHash, createHmac } from "crypto";
+import { env } from "@/lib/env";
 
 export const SESSION_COOKIE = "cph_session";
 export const SESSION_DAYS = 30;
 
 function isProd() {
-  return process.env.NODE_ENV === "production";
+  return env.NODE_ENV === "production";
 }
+
 
 export function setSessionCookie(
   res: { cookies: { set: Function } },
@@ -120,9 +122,7 @@ function base64urlDecode(input: string) {
 }
 
 function sign(data: string) {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) throw new Error("Missing AUTH_SECRET");
-  return createHmac("sha256", secret).update(data).digest("hex");
+  return createHmac("sha256", env.AUTH_SECRET).update(data).digest("hex");
 }
 
 export function createLoginChallenge(input: {
