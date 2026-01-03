@@ -4,16 +4,38 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 type LogContext = Record<string, unknown>;
 
 const REDACT_KEYS = [
+  // credentials
   "password",
   "passwordhash",
+
+  // generic secrets
+  "secret",
+  "auth_secret",
+  "client_secret",
+  "privatekey",
+
+  // tokens
   "token",
   "session",
   "sessiontoken",
   "invitetoken",
+  "access_token",
+  "refresh_token",
+  "id_token",
+
+  // api keys
+  "apikey",
+  "api_key",
+
+  // headers / cookies
   "authorization",
   "cookie",
   "set-cookie",
+
+  // infra / env
+  "database_url",
 ];
+
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
