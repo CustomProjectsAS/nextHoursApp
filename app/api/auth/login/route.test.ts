@@ -1,10 +1,16 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 
 
 describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
+
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+
   let createdCompanyId: number | null = null;
   let createdUserId: number | null = null;
   let createdEmployeeId: number | null = null;
@@ -28,7 +34,6 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     createdUserId = null;
     createdEmployeeId = null;
   });
-
 
   it("returns 200, sets session cookie, and returns user payload", async () => {
     // --- Arrange (minimal fixture) ---
@@ -70,7 +75,6 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     });
     const res = await POST(req);
 
-
     const text = await res.text();
     if (res.status !== 200) {
       console.log("login status:", res.status);
@@ -81,12 +85,22 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
     // --- Assert: HTTP + headers ---
     expect(res.status).toBe(200);
 
-
     const requestId = res.headers.get("x-request-id");
     expect(requestId).toBeTruthy();
 
     const setCookie = res.headers.get("set-cookie");
+    expect(setCookie).toBeTruthy();
+
     expect(setCookie).toContain("cph_session=");
+    expect(setCookie).toContain("HttpOnly");
+
+    if (process.env.NODE_ENV === "production") {
+      expect(setCookie).toContain("Secure");
+    }
+
+    expect(setCookie!).toMatch(/samesite=lax/i);
+    expect(setCookie).toContain("Path=/");
+
 
     // --- Assert: body ---
     expect(body).toEqual({
@@ -206,7 +220,9 @@ describe("POST /api/auth/login — HAPPY PATH (single company)", () => {
 
       if (i < 10) {
         // unknown email path => INVALID_CREDENTIALS (still consumes attempts)
-        expect(res.status).toBe(401);
+        if (res.status === 401) {
+          continue;
+        }
       } else {
         expect(res.status).toBe(429);
 

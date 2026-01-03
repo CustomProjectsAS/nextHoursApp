@@ -27,6 +27,7 @@ jobs:
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:test123@localhost:5432/cphours_test?schema=public&sslmode=disable
+      AUTH_SECRET: ci-test-secret
 
     steps:
       - name: Checkout
