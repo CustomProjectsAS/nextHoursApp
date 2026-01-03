@@ -6,9 +6,7 @@ import { rateLimit } from "@/lib/rateLimit";
 import { okNext, failNext } from "@/lib/api/nextResponse";
 import { withRequestId } from "@/lib/api/withRequestId";
 import { log } from "@/lib/log";
-
-const SESSION_COOKIE = "cph_session";
-const SESSION_DAYS = 30;
+import { setSessionCookie, SESSION_DAYS } from "@/lib/auth";
 
 // Used to equalize timing when user is not found (prevents email enumeration via timing)
 const DUMMY_PASSWORD_HASH =
@@ -226,13 +224,7 @@ export const POST = withRequestId(async (req, requestId) => {
       requestId,
     );
 
-    res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: SESSION_DAYS * 24 * 60 * 60,
-    });
+    setSessionCookie(res, token);
 
     log.info("LOGIN_OK", {
       requestId,
