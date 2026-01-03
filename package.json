@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:local": "cross-env DATABASE_URL=\"postgresql://postgres:test123@localhost:5432/cphours_test?schema=public&sslmode=disable\" vitest run"
+    "test:local": "cross-env DATABASE_URL=\"postgresql://postgres:test123@localhost:5432/cphours_test?schema=public&sslmode=disable\" vitest run",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
